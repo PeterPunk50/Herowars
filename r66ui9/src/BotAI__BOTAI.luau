@@ -1,0 +1,478 @@
+-- R66-ui9 Tactical bot AI (ServerScriptService.HeroWars.BotAI). Peter, 2026-10-12: "Bot AI Strategy &
+-- Priority System" for our four heroes. Main's botThink calls BotAI.think(s, ctx) every server tick while
+-- the sparring bot is in its match. All numbers live in Rules.BotAI (strategy kits, priorities, Easy /
+-- Normal / Hard), so tuning never needs this file.
+--
+-- Parts: sense (what the bot can see), memory (the enemy's recent attacks and rhythm), tactics (one check
+-- per tactic Type), choose (priority score), act (press the button through Main's doAction, same rules as a
+-- player), move (spacing, strafing, flight) and telemetry (AI_* attributes, optional Output log).
+-- Fair play: enemy attacks are noticed only React ticks after they start, invisible enemies can't be
+-- targeted, and every press goes through the normal cooldown / Fury / recovery checks.
+local BotAI = {}
+
+local function rand(r) return math.random(r[1], r[2]) end
+
+-- ctx (from Main): Rules, now() = server tick, states, foe(s,t), alive(s), doAction(s,action,data),
+-- level() = "Easy"/"Normal"/"Hard", clearSight(s,t), flatUnit(v,fallback), groundHeight(s).
+local function cfg(ctx) return ctx.Rules.BotAI end
+
+-- The move a button would fire right now (nil if the hero hasn't got it).
+local function moveFor(ctx, s, use)
+ local Rules = ctx.Rules
+ if use == "Defensive" or use == "Dash" or use == "Flight" then return nil end
+ if not Rules.actionAvailable(s.hero, use) then return nil end
+ local now = ctx.now()
+ local name
+ if use == "Light" then
+  if now < (s.phaseUntil or 0) then name = "ShadeBolt"
+  else name = Rules.moveName(s.hero, "Light", now <= (s.comboUntil or 0) and (s.combo or 0) % 3 + 1 or 1) end
+ else name = Rules.moveName(s.hero, use, 1) end
+ return name and Rules.heroMove(s.hero, name), name
+end
+
+-- Can this button be pressed now? Returns ok, reason ("cooldown", "fury", "gcd", "missing", "busy").
+local function ready(ctx, s, use)
+ local Rules, now = ctx.Rules, ctx.now()
+ if not Rules.actionAvailable(s.hero, use) then return false, "missing" end
+ if use == "Defensive" then
+  if now < (s.cooldowns.Defensive or 0) then return false, "cooldown" end
+  return true
+ end
+ if use == "Flight" then
+  if not Rules.Characters[s.hero].Flies then return false, "missing" end
+  if (s.energy or 0) < Rules.Flight.Takeoff + 15 then return false, "energy" end
+  return true
+ end
+ if use == "Dash" then return now >= (s.cooldowns.Dash or 0) and not s.flying, "cooldown" end
+ local move, name = moveFor(ctx, s, use)
+ if not move then return false, "missing" end
+ if now < (s.cooldowns[name] or 0) then return false, "cooldown" end
+ if move.Cost then
+  if now < (s.gcd or 0) then return false, "gcd" end
+  if (s.fury or 0) < move.Cost then return false, "fury" end
+ end
+ -- Busy: like a player, a press up to BufferFrames before it can act is held by the server and fires then.
+ local buffer = Rules.BufferFrames
+ if now < (s.parryUntil or 0) or (s.stunned or 0) - now > buffer then return false, "busy" end
+ local a = s.action
+ if a and Rules.phase(a.move, a.frame, a.extra) ~= "Recovery" then return false, "busy" end
+ return true, nil, move
+end
+
+-- How far an enemy move reaches (studs), for "will this hit me?".
+local function reach(m)
+ if not m then return 0 end
+ if m.Whirl or m.LockOn then return (m.Range or 0) + 3 end
+ return (m.Range or 0) + (m.Lunge or 0) + (m.Leap or 0) + math.max(m.Aoe or 0, m.Radius or 0) + 2.5
+end
+local function heavy(m)
+ return m and ((m.Damage or 0) >= 12 or (m.Stun or 0) >= 40 or m.Cast or m.Whirl or m.Snare or m.Grounding or m.Throw) and true or false
+end
+
+-- Pattern memory: the enemy's attack starts. Spam = SpamCount starts inside SpamWindow; with Learn the bot
+-- expects the next start one average gap after the last.
+local function remember(ctx, ai, t, act, dist)
+ local C = cfg(ctx)
+ table.insert(ai.seen, {name = act.name, at = ctx.now(), dist = dist, act = act})
+ while #ai.seen > C.Memory do table.remove(ai.seen, 1) end
+end
+local function rhythm(ctx, ai)
+ local C, now = cfg(ctx), ctx.now()
+ local recent = {}
+ for _, e in ai.seen do if now - e.at <= C.SpamWindow then table.insert(recent, e) end end
+ local spam = #recent >= C.SpamCount
+ local gap
+ if #recent >= 2 then gap = (recent[#recent].at - recent[1].at) / (#recent - 1) end
+ return spam, gap, recent[#recent]
+end
+
+-- What the bot can see this tick.
+local function sense(ctx, s, ai)
+ local now, Rules = ctx.now(), ctx.Rules
+ local best, bestDist
+ for key, t in ctx.states do
+  if typeof(key) == "Instance" and key:IsA("Player") and ctx.alive(t) and ctx.foe(s, t) and not t.model:GetAttribute("Invisible") then
+   local d = (t.root.Position - s.root.Position).Magnitude
+   if not bestDist or d < bestDist then best, bestDist = t, d end
+  end
+ end
+ local e = {t = best, dist = bestDist, now = now}
+ if not best then return e end
+ ai.lastSeen = {pos = best.root.Position, at = now}
+ local delta = best.root.Position - s.root.Position
+ e.delta = delta
+ e.flat = ctx.flatUnit(delta, s.root.CFrame.LookVector)
+ e.hp = s.hum.Health / s.hum.MaxHealth
+ e.thp = best.hum.Health / best.hum.MaxHealth
+ e.tAir = best.flying or best.hum.FloorMaterial == Enum.Material.Air
+ e.rise = delta.Y
+ e.tWhirl = best.whirl ~= nil
+ e.tParry = now < (best.parryUntil or 0)
+ e.tShield = (best.shieldHP or 0) > 0
+ e.tInvuln = now < (best.invulnerable or 0)
+ -- Held: stunned, snared or reeling, and hittable (a Whirlwind spin can't be hit).
+ e.tHeld = (now < (best.stunned or 0) or best.snare ~= nil) and not e.tWhirl and not e.tInvuln
+ -- The enemy's current attack, as the bot perceives it.
+ local act = best.action
+ if act ~= ai.watch then
+  if ai.watch then ai.lastWatch = {act = ai.watch, endedAt = now} end
+  ai.watch = act; ai.watchAt = now
+  if act then
+   local react = rand(cfg(ctx).Difficulty[ctx.level()].React)
+   if ai.expectAt and math.abs(now - ai.expectAt) <= 10 then react = math.floor(react / 2); ai.anticipated = true else ai.anticipated = false end
+   ai.react = react
+   remember(ctx, ai, best, act, bestDist)
+  end
+ end
+ if act and now - ai.watchAt >= (ai.react or 0) then
+  e.act = act; e.move = act.move
+  e.phase = Rules.phase(act.move, act.frame, act.extra)
+  e.toHit = math.max(0, act.move.Startup - act.frame)
+  e.casting = act.move.Cast and e.phase == "Startup"
+  e.threat = (e.phase == "Startup" or e.phase == "Active") and bestDist <= reach(act.move)
+  e.heavy = heavy(act.move)
+  e.whiff = e.phase == "Recovery" and not act.contact
+  e.newSeen = ai.noticed ~= act
+ end
+ -- A miss the bot noticed just after it ended still counts as an opening for a moment.
+ if not e.whiff and ai.lastWatch and ai.lastWatch.act and not ai.lastWatch.act.contact and now - ai.lastWatch.endedAt <= 6 then
+  e.whiff = Rules.phase(ai.lastWatch.act.move, ai.lastWatch.act.frame, ai.lastWatch.act.extra) ~= "Startup"
+ end
+ e.spam, e.gap, e.last = rhythm(ctx, ai)
+ if e.spam and e.gap and e.last then ai.expectAt = e.last.at + e.gap else ai.expectAt = nil end
+ e.tFlier = Rules.Characters[best.hero] and Rules.Characters[best.hero].Flies
+ return e
+end
+
+-- One roll per thing (an enemy attack, a stun), so a chance isn't re-rolled every tick.
+local function roll(ai, key, p)
+ ai.rolls = ai.rolls or {}
+ local r = ai.rolls[key]
+ if r == nil then r = math.random() < p; ai.rolls[key] = r end
+ return r
+end
+
+local function respects(ai, e, diff)
+ if not (e.tParry or e.tWhirl or e.tShield or e.tInvuln) then return false end
+ return roll(ai, "respect" .. tostring(e.t.parryUntil) .. tostring(e.tWhirl) .. tostring(e.tShield), diff.Respect)
+end
+
+-- Tactic checks: return a bonus score if the tactic fits the fight now, or nil.
+local TYPES = {}
+TYPES.StunBreak = function(ctx, s, ai, e, tac, diff)
+ local now = ctx.now()
+ local stunLeft = (s.stunned or 0) - now
+ local held = s.whirl or s.snare or now < (s.downUntil or 0) or stunLeft >= 40
+ if not held then return nil end
+ if not roll(ai, "trinket" .. tostring(s.stunned), diff.Trinket) then return nil end
+ return (e.hp or 1) < 0.5 and 40 or 0
+end
+TYPES.Defend = function(ctx, s, ai, e, tac, diff)
+ if not e.threat or (tac.Heavy and not e.heavy) then return nil end
+ if e.toHit > (tac.Lead or 20) then return nil end
+ if not roll(ai, "defend" .. tostring(e.act), diff.Defend) then return nil end
+ return e.heavy and 30 or 0
+end
+TYPES.Evade = function(ctx, s, ai, e, tac, diff)
+ -- No button: step out of a noticed attack's reach (melee) or sideways (a ranged line). Lock-ons can't be walked out of.
+ if not e.threat or e.toHit < 3 or e.move.LockOn or e.move.Whirl or s.flying then return nil end
+ if not roll(ai, "evade" .. tostring(e.act), diff.Defend) then return nil end
+ return 0
+end
+TYPES.Escape = function(ctx, s, ai, e, tac, diff)
+ if (e.hp or 1) > cfg(ctx).LowHealth or e.dist > (tac.Max or 10) then return nil end
+ if not roll(ai, "escape" .. tostring(math.floor(ctx.now() / 120)), diff.Defend) then return nil end
+ ai.retreatUntil = ctx.now() + 60
+ return 20
+end
+TYPES.Interrupt = function(ctx, s, ai, e, tac, diff)
+ if not e.casting then return nil end
+ local m = moveFor(ctx, s, tac.Use)
+ if not m or e.dist > math.min(tac.Max or 999, reach(m) - 1) then return nil end
+ if e.toHit <= (m.Startup or 0) + 2 then return nil end
+ if not roll(ai, "interrupt" .. tostring(e.act), diff.Interrupt) then return nil end
+ return 20
+end
+TYPES.Peel = function(ctx, s, ai, e, tac, diff)
+ if e.dist > (tac.Max or 8) or e.tHeld then return nil end
+ return roll(ai, "peel" .. tostring(math.floor(ctx.now() / 90)), diff.Spacing) and 0 or nil
+end
+TYPES.AntiAir = function(ctx, s, ai, e, tac, diff)
+ if not e.tAir or e.dist > (tac.Max or 40) or e.dist < (tac.Min or 0) or e.tWhirl then return nil end
+ if not roll(ai, "air" .. tostring(math.floor(ctx.now() / 60)), diff.AntiAir) then return nil end
+ return math.clamp(e.rise or 0, 0, 20)
+end
+TYPES.Punish = function(ctx, s, ai, e, tac, diff)
+ if not (e.whiff or e.tHeld) or e.dist > (tac.Max or 8) or e.dist < (tac.Min or 0) then return nil end
+ if respects(ai, e, diff) then return nil end
+ local key = e.whiff and ("whiff" .. tostring(ai.lastWatch and ai.lastWatch.act or e.act)) or ("held" .. tostring(e.t.stunned))
+ if not roll(ai, key, diff.Counter) then return nil end
+ local m = moveFor(ctx, s, tac.Use)
+ return m and (m.Damage or 0) or 0
+end
+TYPES.Combo = function(ctx, s, ai, e, tac, diff)
+ if e.dist > (tac.Max or 6) or e.tAir and e.rise > 6 then return nil end
+ if respects(ai, e, diff) then return nil end
+ return e.tHeld and 30 or 0
+end
+TYPES.Melee = function(ctx, s, ai, e, tac, diff)
+ if e.dist > (tac.Max or 6) or e.dist < (tac.Min or 0) then return nil end
+ if respects(ai, e, diff) then return nil end
+ return 0
+end
+TYPES.GapClose = function(ctx, s, ai, e, tac, diff)
+ if e.dist < (tac.Min or 0) or e.dist > (tac.Max or 30) then return nil end
+ return 0
+end
+TYPES.Ranged = function(ctx, s, ai, e, tac, diff)
+ if e.dist < (tac.Min or 0) or e.dist > (tac.Max or 40) then return nil end
+ if tac.Held and not e.tHeld then return nil end
+ if tac.Phased and ctx.now() >= (s.phaseUntil or 0) then return nil end
+ if not tac.Phased and tac.Use == "Light" then return nil end
+ if e.tWhirl or respects(ai, e, diff) then return nil end
+ if ctx.clearSight and not ctx.clearSight(s, e.t) then return nil end
+ return 0
+end
+TYPES.Zone = function(ctx, s, ai, e, tac, diff)
+ if e.dist > (tac.Max or 9) then return nil end
+ if tac.Held and not e.tHeld then return nil end
+ return 0
+end
+TYPES.Phase = function(ctx, s, ai, e, tac, diff)
+ if ctx.now() < (s.phaseUntil or 0) then return nil end
+ if e.tAir and (e.rise or 0) > 6 then return 40 end -- Shade Bolts lock on to a flyer
+ if e.dist < (tac.Min or 12) then return nil end
+ return 0
+end
+TYPES.Fly = function(ctx, s, ai, e, tac, diff)
+ if s.flying then return nil end
+ if tac.When == "foeFlies" then
+  if not (e.t.flying and (e.rise or 0) > 6) then return nil end
+  return roll(ai, "fly" .. tostring(math.floor(ctx.now() / 120)), diff.AntiAir) and 0 or nil
+ end
+ if tac.When == "kited" then
+  ai.farSince = e.dist > 30 and (ai.farSince or ctx.now()) or nil
+  if not ai.farSince or ctx.now() - ai.farSince < 120 then return nil end
+  return 0
+ end
+ return nil
+end
+TYPES.Reveal = function(ctx, s, ai, e, tac, diff) return nil end -- only used when no enemy is visible (below)
+TYPES.Bait = function(ctx, s, ai, e, tac, diff)
+ if not diff.Learn or not e.spam or not ai.expectAt or not e.last then return nil end
+ local soon = ai.expectAt - ctx.now()
+ if soon < -4 or soon > 24 then return nil end
+ local m = e.last.act and e.last.act.move
+ if not m or e.dist > reach(m) + 1 then return nil end
+ -- One bait per expected attack, and not back to back.
+ if ai.baitFor == e.last.at or ctx.now() - (ai.baitAt or -999) < 60 then return nil end
+ if not roll(ai, "bait" .. tostring(e.last.at), diff.Bait) then return nil end
+ return 0
+end
+BotAI.Types = TYPES
+
+-- Fury reserve (Normal/Hard): against a flying hero, keep enough Fury for the anti-air move.
+local function reserveBlocks(ctx, s, kit, tac, e, diff)
+ if not diff.Reserve or not kit.Reserve or tac.P == 1 or not e.tFlier or tac.Use == kit.Reserve then return false end
+ local m = moveFor(ctx, s, tac.Use)
+ local keep = moveFor(ctx, s, kit.Reserve)
+ if not m or not m.Cost or not keep or not keep.Cost then return false end
+ return (s.fury or 0) - m.Cost < keep.Cost
+end
+
+local function setAttr(s, name, value)
+ if s.model:GetAttribute(name) ~= value then s.model:SetAttribute(name, value) end
+end
+
+local function log(ctx, s, ai, text)
+ local C = cfg(ctx)
+ if C.Debug then print(string.format("[BotAI] t=%d %s %s: %s", ctx.now(), ctx.level(), s.hero, text)) end
+end
+
+-- Press a button; a combo tactic queues the rest of its chain.
+local function press(ctx, s, ai, tac, use, score)
+ local now = ctx.now()
+ ctx.doAction(s, use)
+ ai.stats.presses += 1
+ local C = cfg(ctx)
+ if C.Attributes then
+  setAttr(s, "AI_Tactic", tac.Id); setAttr(s, "AI_Priority", "P" .. tac.P)
+  setAttr(s, "AI_Score", math.floor(score)); setAttr(s, "AI_Move", use)
+ end
+ local reaction = ai.watch and now - (ai.watchAt or now) or nil
+ if ctx.onPress then ctx.onPress(s, tac, use, score, reaction) end
+ if ai.watch and (tac.Type == "Defend" or tac.Type == "Interrupt" or tac.Type == "Punish") then
+  ai.noticed = ai.watch
+  if C.Attributes then setAttr(s, "AI_React", reaction) end
+  log(ctx, s, ai, string.format("%s P%d %s (score %d, reacted in %d ticks%s)", tac.Id, tac.P, use, score, reaction, ai.anticipated and ", anticipated" or ""))
+ else
+  log(ctx, s, ai, string.format("%s P%d %s (score %d)", tac.Id, tac.P, use, score))
+ end
+end
+
+-- Pick the best tactic for this moment and use it. Returns true if something was pressed.
+local function decide(ctx, s, ai, e, diff, kit)
+ local C, now = cfg(ctx), ctx.now()
+ local fits, rejected = {}, nil
+ for _, tac in kit.Tactics do
+  local check = TYPES[tac.Type]
+  local bonus = check and check(ctx, s, ai, e, tac, diff)
+  if bonus then
+   local ok, why = true, nil
+   if tac.Use then ok, why = ready(ctx, s, tac.Use) end
+   if ok and tac.Type == "Combo" then ok, why = ready(ctx, s, tac.Chain[1]) end
+   if ok and tac.Use and reserveBlocks(ctx, s, kit, tac, e, diff) then ok, why = false, "reserve" end
+   if ok then
+    table.insert(fits, {tac = tac, score = C.PriorityScore[tac.P] + bonus + (tac.Bonus or 0) + math.random() * diff.Noise})
+   elseif not rejected then rejected = tac.Id .. ": " .. tostring(why) end
+  end
+ end
+ if rejected then
+  ai.stats.rejects += 1
+  if C.Attributes then setAttr(s, "AI_Reject", rejected) end
+ end
+ if #fits == 0 then return false end
+ table.sort(fits, function(a, b) return a.score > b.score end)
+ local pick = fits[1]
+ if #fits > 1 and math.random() < diff.Mistake then pick = fits[math.random(2, #fits)] end
+ local tac = pick.tac
+ if tac.Type == "Bait" then
+  ai.mode = "bait"; ai.modeUntil = (ai.expectAt or now) + 12; ai.baitFor = e.last.at; ai.baitAt = now
+  ai.baitReach = reach(e.last.act.move) + 1.5
+  if C.Attributes then setAttr(s, "AI_Tactic", tac.Id); setAttr(s, "AI_Priority", "P" .. tac.P); setAttr(s, "AI_Move", "step back") end
+  if ctx.onPress then ctx.onPress(s, tac, "bait", pick.score, nil) end
+  log(ctx, s, ai, "BaitSpam: steps out of reach of the expected attack")
+  return true
+ end
+ if tac.Type == "Evade" then
+  local ranged = (e.move.Range or 0) > 12
+  ai.mode = ranged and "sidestep" or "evade"; ai.modeUntil = now + e.toHit + 14
+  ai.sideSign = math.random() < 0.5 and 1 or -1
+  if C.Attributes then setAttr(s, "AI_Tactic", tac.Id); setAttr(s, "AI_Priority", "P" .. tac.P); setAttr(s, "AI_Move", ranged and "sidestep" or "step back") end
+  if ctx.onPress then ctx.onPress(s, tac, ai.mode, pick.score, now - (ai.watchAt or now)) end
+  log(ctx, s, ai, string.format("%s: %s from %s (%d ticks to impact)", tac.Id, ai.mode, tostring(e.act.name), e.toHit))
+  return true
+ end
+ if tac.Type == "Fly" then
+  press(ctx, s, ai, tac, "Flight", pick.score); return true
+ end
+ if tac.Type == "Combo" then
+  local n = math.min(#tac.Chain, rand(diff.Combo))
+  ai.plan = table.move(tac.Chain, 2, n, 1, {}); ai.planTac = tac
+  press(ctx, s, ai, tac, tac.Chain[1], pick.score)
+  return true
+ end
+ if tac.Type == "Defend" and tac.Use == "Dash" then s.dir = -e.flat end
+ if tac.Type == "Escape" or tac.Type == "Peel" then ai.retreatUntil = now + 45 end
+ press(ctx, s, ai, tac, tac.Use, pick.score)
+ if tac.Type == "Defend" and (s.hero == "Tempest" or s.hero == "Wraithstep") then ai.retreatUntil = now + 30 end
+ return true
+end
+
+-- Movement every tick: keep the kit's range, strafe, step out for a bait, retreat, fly.
+local function move(ctx, s, ai, e, diff, kit)
+ local now = ctx.now()
+ local flat = e.flat
+ local side = flat:Cross(Vector3.yAxis)
+ local dir = Vector3.zero
+ local state
+ if ai.mode == "bait" and now < (ai.modeUntil or 0) then dir = e.dist < (ai.baitReach or 9) and -flat or Vector3.zero; state = "baiting"
+ elseif ai.mode == "evade" and now < (ai.modeUntil or 0) then dir = -flat; state = "evading"
+ elseif ai.mode == "sidestep" and now < (ai.modeUntil or 0) then dir = side * (ai.sideSign or 1); state = "sidestepping"
+ elseif now < (ai.retreatUntil or 0) then dir = -flat; state = "retreating"
+ elseif e.dist > (kit.Ideal or 5) + 1.5 then dir = flat; state = "closing in"
+ elseif e.dist < (kit.Min or 2) and roll(ai, "space" .. tostring(math.floor(now / 30)), diff.Spacing) then dir = -flat; state = "making space"
+ else
+  if not ai.strafeAt or now >= ai.strafeAt then
+   ai.strafeAt = now + math.random(30, 70)
+   ai.strafeSign = math.random() < 0.5 and 1 or -1
+   ai.strafing = math.random() < diff.Spacing
+  end
+  dir = ai.strafing and side * ai.strafeSign or Vector3.zero
+  state = ai.strafing and "circling" or "holding"
+ end
+ if s.flying then
+  -- Flight: match the enemy's height (a little above), land before the energy runs out.
+  local want = e.t.flying and (e.rise + 3) or -6
+  local y = math.clamp(want / 8, -1, 1)
+  dir = Vector3.new(dir.X, y, dir.Z)
+  if (s.energy or 0) <= (kit.LandEnergy or 30) or (not e.t.flying and e.dist < 12 and e.rise > -3) then
+   if not ai.landAt or now - ai.landAt > 30 then ai.landAt = now; ctx.doAction(s, "Flight"); log(ctx, s, ai, "lands (energy " .. math.floor(s.energy or 0) .. ")") end
+  end
+  state = "flying"
+ end
+ s.dir = dir
+ if cfg(ctx).Attributes then setAttr(s, "AI_State", state) end
+end
+
+-- Hits and misses of the bot's own attacks (telemetry).
+local function trackOwn(ctx, s, ai)
+ if s.action ~= ai.own then
+  if ai.own then
+   if ai.own.contact then ai.stats.hits += 1 else ai.stats.misses += 1 end
+   if cfg(ctx).Attributes then setAttr(s, "AI_Hits", ai.stats.hits); setAttr(s, "AI_Misses", ai.stats.misses) end
+  end
+  ai.own = s.action
+ end
+end
+
+function BotAI.reset(s) s.ai = nil end
+
+function BotAI.think(s, ctx)
+ local C = cfg(ctx)
+ local kit = C.Kits[s.hero]
+ local diff = C.Difficulty[ctx.level()] or C.Difficulty.Normal
+ if not kit then return end
+ local now = ctx.now()
+ local ai = s.ai
+ if not ai then
+  ai = {seen = {}, stats = {presses = 0, hits = 0, misses = 0, rejects = 0}, offset = math.random(0, 5)}
+  s.ai = ai
+ end
+ trackOwn(ctx, s, ai)
+ local e = sense(ctx, s, ai)
+ s.lastMove = now
+ if not e.t then
+  s.dir = Vector3.zero; s.lock = false; s.hasTarget = false
+  -- The enemy vanished: Reveal tactics slam where they were last seen.
+  local seen = ai.lastSeen
+  if seen and now - seen.at <= 90 and now >= (ai.nextThink or 0) then
+   ai.nextThink = now + rand(diff.Think)
+   for _, tac in kit.Tactics do
+    if tac.Type == "Reveal" and (seen.pos - s.root.Position).Magnitude <= (tac.Max or 12) and ready(ctx, s, tac.Use) then
+     press(ctx, s, ai, tac, tac.Use, C.PriorityScore[tac.P]); break
+    end
+   end
+  end
+  if C.Attributes then setAttr(s, "AI_State", "no target") end
+  return
+ end
+ if e.delta.Magnitude > 0.1 then s.aim = e.delta.Unit end
+ s.lock = true; s.hasTarget = true
+ move(ctx, s, ai, e, diff, kit)
+ -- A combo in progress: the next press as soon as the last one connects or ends.
+ if ai.plan and #ai.plan > 0 then
+  local a = s.action
+  if not a or a.contact or (s.action and ctx.Rules.phase(a.move, a.frame, a.extra) == "Recovery") then
+   local use = table.remove(ai.plan, 1)
+   if not respects(ai, e, diff) and e.dist <= (ai.planTac.Max or 6) + 2 then
+    ctx.doAction(s, use)
+    if C.Attributes then setAttr(s, "AI_Move", use) end
+   else ai.plan = nil end
+  end
+  return
+ end
+ -- Think on a timer, plus at once when something new is noticed (an attack, being stunned).
+ local stunnedNow = now < (s.stunned or 0)
+ local woke = ai.wasStunned and not stunnedNow
+ ai.wasStunned = stunnedNow
+ local urgent = (e.act and e.newSeen) or woke or ((s.stunned or 0) - now >= 40 and ai.stunSeen ~= s.stunned)
+ if urgent and (s.stunned or 0) - now >= 40 then ai.stunSeen = s.stunned end
+ if not urgent and now < (ai.nextThink or 0) then return end
+ ai.nextThink = now + rand(diff.Think) + ai.offset
+ if e.act then ai.noticed = e.act end
+ decide(ctx, s, ai, e, diff, kit)
+ if ai.rolls and now - (ai.rollsAt or 0) > 600 then table.clear(ai.rolls); ai.rollsAt = now end
+end
+
+return BotAI

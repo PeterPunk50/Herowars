@@ -1,0 +1,117 @@
+-- R66-ui9 Tactical bot AI (Peter, 2026-10-12: "Bot AI Strategy & Priority System", our four heroes only).
+-- Pure data, read by the server ModuleScript ServerScriptService.HeroWars.BotAI. Tune the bot here; no code
+-- changes are needed. Times are 60 Hz ticks (60 = 1 s); distances are studs.
+--
+-- How a decision works: every Think ticks (and the moment the bot notices something new) each tactic in the
+-- hero's kit is checked. A tactic that fits the fight scores PriorityScore[P] + its own bonus + a random
+-- 0..Noise. The best score wins (Mistake = chance it picks a random fitting tactic instead). P1 always beats
+-- P2, P2 beats P3, unless Noise is bigger than the gap (Easy).
+-- The bot never sees more than a player would: an enemy attack is only noticed React ticks after its
+-- wind-up starts, it can't target someone invisible, and it uses the same buttons, cooldowns, Fury and
+-- recovery as a player.
+Rules.BotAI = {
+ Debug = false,          -- true: every decision is printed to Output as "[BotAI] ..."
+ Attributes = true,      -- the bot model carries live AI_* attributes (select it in the Explorer to watch)
+ PriorityScore = {300, 200, 100}, -- P1, P2, P3
+ SpamCount = 3,          -- this many enemy attack starts inside SpamWindow ticks counts as "spamming"
+ SpamWindow = 150,
+ Memory = 8,             -- enemy attack starts remembered (pattern memory)
+ LowHealth = 0.3,        -- below this share of health, survival tactics come first
+ Difficulty = {
+  -- React: ticks before an enemy wind-up is noticed (random in the range). Think: ticks between plans.
+  -- Defend: chance to defend a threatening attack it noticed. Counter: chance to punish a miss or an opening.
+  -- Combo: how many presses of a combo chain it carries out. AntiAir / Interrupt / Trinket: chances.
+  -- Noise: random score added to every tactic. Mistake: chance of a random fitting tactic.
+  -- Learn: remembers the enemy's rhythm and baits spam. Bait: chance to bait when it does.
+  -- Reserve: keeps Fury for its anti-air move against a flying hero. Respect: chance to hold back from
+  -- hitting into a Shield Parry, a Whirlwind spin or a Solar Shield. Spacing: chance to keep its range.
+  Easy = {React = {30, 48}, Think = {24, 36}, Defend = 0.2, Counter = 0.25, Combo = {1, 2}, AntiAir = 0.25,
+   Interrupt = 0.15, Trinket = 0.25, Noise = 120, Mistake = 0.3, Learn = false, Bait = 0, Reserve = false,
+   Respect = 0.1, Spacing = 0.3},
+  Normal = {React = {18, 30}, Think = {12, 20}, Defend = 0.5, Counter = 0.6, Combo = {2, 3}, AntiAir = 0.6,
+   Interrupt = 0.5, Trinket = 0.6, Noise = 50, Mistake = 0.1, Learn = false, Bait = 0, Reserve = true,
+   Respect = 0.6, Spacing = 0.7},
+  Hard = {React = {12, 18}, Think = {6, 12}, Defend = 0.7, Counter = 0.85, Combo = {3, 4}, AntiAir = 0.85,
+   Interrupt = 0.8, Trinket = 0.85, Noise = 20, Mistake = 0.03, Learn = true, Bait = 0.6, Reserve = true,
+   Respect = 0.9, Spacing = 0.9},
+ },
+ -- Strategy kits. Ideal / Min = the range it likes and the closest it lets an enemy stay. Use = the button.
+ -- Type says what the tactic waits for (see BotAI for each):
+ --   StunBreak  stunned 0.7 s+, spun, snared or knocked down: use the defensive as a trinket
+ --   Defend     a noticed enemy attack will land within Lead ticks (Heavy = only big attacks)
+ --   Escape     health under LowHP and the enemy is close
+ --   Interrupt  the enemy is channelling a cast that won't finish before this lands
+ --   Peel       an enemy closer than Max is walking in (ranged heroes push them off)
+ --   AntiAir    the enemy is flying or in the air, Min..Max away
+ --   Punish     the enemy just missed (in recovery), or is held (stunned/snared), Min..Max away
+ --   Combo      a chain of presses (Chain) in melee reach Max
+ --   Melee      one press in reach Max     GapClose  Min..Max away     Ranged  Min..Max away, clear sight
+ --   Zone       a circle/sphere when the enemy is within Max (Held = only on a held enemy)
+ --   Phase      Wraithstep's Phase when the enemy is Min+ away   Fly  take off (When "foeFlies" or "kited")
+ --   Reveal     the enemy vanished within Max: slam where they were   Bait  (Hard) step out of a spammer's reach
+ Kits = {
+  Bulwark = {Ideal = 5, Min = 2, Reserve = "Interrupt", Tactics = {
+   {Id = "Trinket", P = 1, Type = "StunBreak", Use = "Defensive"},
+   {Id = "Parry", P = 1, Type = "Defend", Use = "Defensive", Lead = 30},
+   {Id = "ShieldThrowCast", P = 1, Type = "Interrupt", Use = "Interrupt"},
+   {Id = "ShieldThrowAir", P = 1, Type = "AntiAir", Use = "Interrupt", Max = 33},
+   {Id = "ChargeLeapAir", P = 1, Type = "AntiAir", Use = "Skill2", Max = 30, Bonus = -10},
+   {Id = "CleavePunish", P = 1, Type = "Punish", Use = "Heavy", Max = 9},
+   {Id = "SlamPunish", P = 1, Type = "Punish", Use = "Skill1", Max = 11, Bonus = 10},
+   {Id = "RevealSlam", P = 2, Type = "Reveal", Use = "Skill1", Max = 12},
+   {Id = "DoorAir", P = 2, Type = "AntiAir", Use = "Skill3", Min = 12, Max = 60},
+   {Id = "CleaveSlam", P = 2, Type = "Combo", Chain = {"Heavy", "Skill1"}, Max = 8.5},
+   {Id = "Slam", P = 2, Type = "Melee", Use = "Skill1", Max = 11},
+   {Id = "ChargeIn", P = 2, Type = "GapClose", Use = "Skill2", Min = 7, Max = 16},
+   {Id = "DoorIn", P = 3, Type = "GapClose", Use = "Skill3", Min = 22, Max = 62},
+   {Id = "BaitSpam", P = 3, Type = "Bait"},
+  }},
+  Tempest = {Ideal = 14, Min = 9, Reserve = "Skill2", Tactics = {
+   {Id = "Trinket", P = 1, Type = "StunBreak", Use = "Defensive"},
+   {Id = "Tailwind", P = 1, Type = "Defend", Use = "Defensive", Lead = 14, Heavy = true},
+   {Id = "TailwindLow", P = 1, Type = "Escape", Use = "Defensive", Max = 9},
+   {Id = "WhirlLow", P = 1, Type = "Escape", Use = "Skill3", Max = 20, Bonus = 20},
+   {Id = "SnareCast", P = 1, Type = "Interrupt", Use = "Skill2", Max = 48},
+   {Id = "WhirlCast", P = 1, Type = "Interrupt", Use = "Skill3", Max = 55, Bonus = -10},
+   {Id = "SnareAir", P = 1, Type = "AntiAir", Use = "Skill2", Max = 48},
+   {Id = "FistPunish", P = 1, Type = "Punish", Use = "Heavy", Max = 21},
+   {Id = "SnarePeel", P = 1, Type = "Peel", Use = "Skill2", Max = 8, Bonus = -20},
+   {Id = "LightningHeld", P = 2, Type = "Ranged", Use = "Skill1", Min = 8, Max = 48, Held = true, Bonus = 40},
+   {Id = "LightningAir", P = 2, Type = "AntiAir", Use = "Skill1", Max = 48},
+   {Id = "SparkCombo", P = 2, Type = "Combo", Chain = {"Light", "Light", "Light", "Heavy"}, Max = 19},
+   {Id = "StormFist", P = 2, Type = "Melee", Use = "Heavy", Max = 21},
+   {Id = "Lightning", P = 3, Type = "Ranged", Use = "Skill1", Min = 22, Max = 48},
+   {Id = "FlyUp", P = 3, Type = "Fly", When = "foeFlies"},
+   {Id = "BaitSpam", P = 3, Type = "Bait"},
+  }},
+  Solarion = {Ideal = 5, Min = 2, LandEnergy = 35, Tactics = {
+   {Id = "Trinket", P = 1, Type = "StunBreak", Use = "Defensive"},
+   {Id = "SolarShield", P = 1, Type = "Defend", Use = "Defensive", Lead = 40, Heavy = true},
+   {Id = "ShieldLow", P = 1, Type = "Escape", Use = "Defensive", Max = 10},
+   {Id = "HammerAir", P = 1, Type = "AntiAir", Use = "Heavy", Max = 28},
+   {Id = "PouncePunish", P = 1, Type = "Punish", Use = "Skill2", Min = 4, Max = 24},
+   {Id = "JabPunish", P = 1, Type = "Punish", Use = "Light", Max = 6, Bonus = 10},
+   {Id = "FlyAir", P = 2, Type = "Fly", When = "foeFlies"},
+   {Id = "Absorb", P = 2, Type = "Zone", Use = "Skill3", Max = 9},
+   {Id = "SunCombo", P = 2, Type = "Combo", Chain = {"Light", "Light", "Light", "Heavy"}, Max = 6},
+   {Id = "Hammer", P = 2, Type = "Ranged", Use = "Heavy", Min = 8, Max = 28},
+   {Id = "PounceIn", P = 3, Type = "GapClose", Use = "Skill2", Min = 10, Max = 24},
+   {Id = "FlyKited", P = 3, Type = "Fly", When = "kited"},
+   {Id = "BaitSpam", P = 3, Type = "Bait"},
+  }},
+  Wraithstep = {Ideal = 4, Min = 2, Reserve = "Skill1", Tactics = {
+   {Id = "Trinket", P = 1, Type = "StunBreak", Use = "Defensive"},
+   {Id = "VanishStep", P = 1, Type = "Defend", Use = "Defensive", Lead = 16, Heavy = true},
+   {Id = "VanishLow", P = 1, Type = "Escape", Use = "Defensive", Max = 10},
+   {Id = "GrappleAir", P = 1, Type = "AntiAir", Use = "Skill1", Max = 60},
+   {Id = "ScythePunish", P = 1, Type = "Punish", Use = "Heavy", Max = 8},
+   {Id = "SlashPunish", P = 1, Type = "Punish", Use = "Light", Max = 6, Bonus = -10},
+   {Id = "CircleHeld", P = 2, Type = "Zone", Use = "Skill3", Max = 8, Held = true, Bonus = 30},
+   {Id = "ShadeCombo", P = 2, Type = "Combo", Chain = {"Light", "Light", "Light", "Heavy"}, Max = 6},
+   {Id = "ShadeBolts", P = 2, Type = "Ranged", Use = "Light", Min = 6, Max = 38, Phased = true},
+   {Id = "GrappleKite", P = 2, Type = "Ranged", Use = "Skill1", Min = 14, Max = 60},
+   {Id = "PhaseRange", P = 3, Type = "Phase", Use = "Skill2", Min = 12},
+   {Id = "BaitSpam", P = 3, Type = "Bait"},
+  }},
+ },
+}

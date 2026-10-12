@@ -1,0 +1,122 @@
+--- ../r66ui/src/Main__7.luau	2026-10-12 15:45:15.193793000 +0000
++++ src/Main__7.luau	2026-10-12 22:39:02.782941000 +0000
+@@ -1706,110 +1706,22 @@
+   end
+  end
+ end
+--- Sparring bot: the dummy walks up, mixes strikes, throws, blocks and dodges.
+--- It fights only during its own match's FIGHT phase; how hard depends on its level (Rules.Bot).
++-- Sparring bot. R66-ui9 (Peter: "Bot AI Strategy & Priority System"): the tactical AI lives in the BotAI
++-- module next to this script, and its strategy kits, priorities and Easy / Normal / Hard settings are data in
++-- Rules.BotAI. This only decides whether the bot is fighting (its own match's FIGHT phase).
++D.BotAI=require(script.Parent:WaitForChild("BotAI"))
++D.botCtx={Rules=Rules,states=states,alive=alive,clearSight=clearSight,flatUnit=flatUnit,
++ foe=function(a,b) return foe(a,b) end,doAction=function(s,a,d) doAction(s,a,d) end,
++ now=function() return tick end,level=function() return botLevel end}
+ local function botThink(s)
+  local fighting=botOn() and D.of.Bot~=nil and D.of.Bot.phase=="Fight"
+  if not fighting then
+   s.dir=Vector3.zero; s.lock=false
+   if s.blockHeld then doAction(s,"Block",false) end
++  if s.flying then doAction(s,"Flight") end
+   return
+  end
+- local level=Rules.Bot[botLevel]
+- -- v27: break a long stun or a knockdown with the defensive, like a player using a trinket.
+- local down=tick<(s.downUntil or 0)
+- if (down or s.stunned-tick>=40) and s.botTrinketAt~=s.stunned then
+-  s.botTrinketAt=s.stunned
+-  if math.random()<(down and level.Trinket*0.5 or level.Trinket) then doAction(s,"Defensive") end
+- end
+- local best,bestDist
+- for key,t in states do
+-  if typeof(key)=="Instance" and key:IsA("Player") and alive(t) and foe(s,t) and not t.model:GetAttribute("Invisible") then
+-   local d=(t.root.Position-s.root.Position).Magnitude
+-   if not bestDist or d<bestDist then best,bestDist=t,d end
+-  end
+- end
+- s.lastMove=tick
+- if not best then
+-  s.dir=Vector3.zero; s.lock=false
+-  if s.blockHeld then doAction(s,"Block",false) end
+-  return
+- end
+- local delta=best.root.Position-s.root.Position
+- if delta.Magnitude>0.1 then s.aim=delta.Unit end
+- s.lock=true
+- if s.botBlockUntil and tick>=s.botBlockUntil then s.botBlockUntil=nil; doAction(s,"Block",false) end
+- if tick<(s.botNext or 0) then return end
+- s.botNext=tick+math.random(level.Think[1],level.Think[2])
+- local flat=flatUnit(delta,s.root.CFrame.LookVector)
+- local threat=best.action~=nil and Rules.phase(best.action.move,best.action.frame,best.action.extra)=="Startup"
+- -- v49: kick a cast in range, fire the super when the meter is full, and sometimes use Skill 3.
+- local kick=Rules.heroMove(s.hero,"Interrupt")
+- if kick and Rules.actionAvailable(s.hero,"Interrupt") and best.action and best.action.move.Cast and best.action.frame<best.action.move.Startup-6 and bestDist<=kick.Range
+-  and tick>=(s.cooldowns.Interrupt or 0) and math.random()<(level.Ranged or 0)+0.35 then
+-  doAction(s,"Interrupt"); return
+- end
+- local super=Rules.heroMove(s.hero,"Super")
+- if super and (s.super or 0)>=Rules.Super.Max and bestDist<=(super.Aoe or super.Range+(super.Lunge or 0)) and math.random()<level.Attack then
+-  doAction(s,"Super"); return
+- end
+- -- R28 (Peter: "make bot use vanish, check the bots"): Wraithstep vanishes when hurt or to close in
+- -- unseen (the first hit from hiding is a sneak attack); the rest of the bot logic below already walks in
+- -- and attacks, which ends the vanish.
+- local invisible=s.model:GetAttribute("Invisible")==true
+- if s.hero=="Wraithstep" and not invisible and tick>=(s.cooldowns.Defensive or 0) and tick>=s.stunned
+-  and ((s.hum.Health/s.hum.MaxHealth<0.5 and math.random()<0.6) or (bestDist>12 and math.random()<0.2)) then
+-  doAction(s,"Defensive"); return
+- end
+- -- R28: Bulwark raises Shield Parry against a swing that's winding up close by.
+- if s.hero=="Bulwark" and threat and bestDist<=10 and tick>=(s.cooldowns.Defensive or 0) and math.random()<level.Block then
+-  doAction(s,"Defensive"); return
+- end
+- local s3=Rules.heroMove(s.hero,Rules.HeroSkills[s.hero].Skill3 or "")
+- -- R28: Shadow Circle has no range of its own, so it is cast when the target is close enough to be inside it.
+- local s3Reach=s3 and (s3.ShadowCircle and (s3.Radius or 10)-2 or math.max(s3.Range,s3.Aoe or 0))
+- if s3 and math.random()<0.08 and bestDist<=s3Reach and bestDist>=(s3.MinRange or 0) then
+-  doAction(s,"Skill3"); return
+- end
+- local airborne=best.flying or best.hum.FloorMaterial==Enum.Material.Air
+- -- R28 anti-air: Bulwark leaps with Charge when close and uses Dimension Door (teleport and ground)
+- -- when the flyer is out of reach; Solarion pulses with Solar Hammer; the others use Skill 1.
+- if airborne and math.random()<level.AntiAir then
+-  if s.hero=="Bulwark" then
+-   -- R37: Shield Throw first when it's ready and the flyer is in its reach.
+-   local throw=Rules.heroMove(s.hero,"Interrupt")
+-   if throw and throw.ShieldThrow and bestDist<=throw.Range-2 and tick>=(s.cooldowns.Interrupt or 0) then doAction(s,"Interrupt"); return end
+-   local door=Rules.heroMove(s.hero,"DimensionDoor")
+-   doAction(s,(door and bestDist>12 and bestDist<=door.Range) and "Skill3" or "Skill2"); return
+-  elseif s.hero=="Solarion" then doAction(s,"Heavy"); return
+-  elseif Rules.HeroSkills[s.hero].Skill1 then doAction(s,"Skill1"); return end
+- end
+- -- Long-range Skill 1 (Lightning, Grapple; R29: Grapple works on grounded targets too) from a distance; Solarion's Hammer pulses.
+- local ranged=Rules.heroMove(s.hero,Rules.HeroSkills[s.hero].Skill1 or "")
+- if ranged and ranged.Range>=30 and (airborne or not ranged.AirOnly) and bestDist>8 and bestDist<=ranged.Range-2 and math.random()<(level.Ranged or 0) then
+-  doAction(s,"Skill1"); return
+- end
+- local hammer=s.hero=="Solarion" and Rules.heroMove(s.hero,"Heavy")
+- if hammer and hammer.Pulses and bestDist>8 and bestDist<=hammer.Range-2 and math.random()<(level.Ranged or 0) then
+-  doAction(s,"Heavy"); return
+- end
+- if bestDist>5.5 then
+-  s.dir=flat
+-  if Rules.actionAvailable(s.hero,"Dash") and bestDist>14 and math.random()<level.Dash then doAction(s,"Dash") end
+-  return
+- end
+- s.dir=Vector3.zero
+- if s.botBlockUntil then return end
+- local r=math.random()
+- if Rules.actionAvailable(s.hero,"Dash") and threat and r<level.Block+level.Evade then s.dir=-flat; doAction(s,"Dash"); return end
+- r=math.random()
+- if r<level.Attack then
+-  local pick=math.random()
+-  if pick<0.62 then doAction(s,Rules.actionAvailable(s.hero,"Light") and "Light" or "Heavy")
+-  elseif pick<0.84 then doAction(s,"Heavy")
+-  else doAction(s,Rules.actionAvailable(s.hero,"Skill2") and "Skill2" or "Heavy") end -- R32: not every hero has a Skill 2 now
+- elseif r<level.Attack+0.15 then s.dir=(math.random()<0.5 and 1 or -1)*flat:Cross(Vector3.yAxis)
+- else s.dir=-flat end
++ D.BotAI.think(s,D.botCtx)
+ end
+ local previewFolder=Instance.new("Folder"); previewFolder.Name="Previews"; previewFolder.Parent=RS.HeroWars
+ -- R22 (Peter: "the preview lobby skin load slow"): each preview used to build a whole new body from
