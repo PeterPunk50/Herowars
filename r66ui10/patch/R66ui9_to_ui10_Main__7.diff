@@ -1,0 +1,49 @@
+--- ../r66ui9/src/Main__7.luau	2026-10-12 23:53:18.412595901 +0000
++++ src/Main__7.luau	2026-10-12 23:53:17.904590582 +0000
+@@ -679,7 +679,8 @@
+  -- Without flight or a leap, a jump tops out about 5 studs up.
+  -- (Flight ending reaches the client late, so a flyer may still be rising for a moment after.)
+  if not s.flying and delta.Y>0.05 and tick>=(s.airGrace or 0) and tick>=(s.leapTop or 0)
+-  and tick-s.lastFlight>pingTicks(s)+Rules.Net.GraceTicks+Rules.Net.AirGrace and heightAboveGround(s)>Rules.Net.JumpRise then
++  and tick-s.lastFlight>pingTicks(s)+Rules.Net.GraceTicks+Rules.Net.AirGrace and heightAboveGround(s)>D.jumpRise(s)
++  and not (Rules.Climb[s.hero] and Rules.Climb[s.hero].Wall and D.Climb and D.Climb.onWall(s.model,s.root)) then
+   snapBack(s,true)
+  end
+ end
+@@ -1446,6 +1447,13 @@
+ -- nobody can interfere; everyone else spars freely or WATCHes a duel. Two players alone in a server still
+ -- start a duel on their own, as before. Fighters are keyed by Player, or by "Bot" for the sparring bot.
+ D={list={},of={},queue={},challenges={},nextId=0}
++-- R66-ui10: a higher jump (Rules.Characters.<hero>.JumpPower) and a ledge pull-up reach higher before the
++-- anti-cheat calls it flying; Wraithstep on a wall (spider climb) is checked separately.
++function D.jumpRise(s)
++ local jp=Rules.Characters[s.hero].JumpPower or 45
++ local mantle=Rules.Climb and Rules.Climb[s.hero] and Rules.Climb[s.hero].Mantle or 0
++ return Rules.Net.JumpRise+math.max(0,(jp*jp-45*45)/(2*workspace.Gravity))+mantle
++end
+ local function stateOf(key) if key=="Bot" then return dummy end return states[key] end
+ local function nameOf(key) if key=="Bot" then return "Sparring bot" end return key.DisplayName end
+ local function keyOf(s) if not s then return nil end if s.isDummy then return "Bot" end return s.player end
+@@ -1710,6 +1718,7 @@
+ -- module next to this script, and its strategy kits, priorities and Easy / Normal / Hard settings are data in
+ -- Rules.BotAI. This only decides whether the bot is fighting (its own match's FIGHT phase).
+ D.BotAI=require(script.Parent:WaitForChild("BotAI"))
++D.Climb=require(RS.HeroWars:WaitForChild("Climb")) -- R66-ui10 wall climb / ledge pull-up / bot jumps
+ D.botCtx={Rules=Rules,states=states,alive=alive,clearSight=clearSight,flatUnit=flatUnit,
+  foe=function(a,b) return foe(a,b) end,doAction=function(s,a,d) doAction(s,a,d) end,
+  now=function() return tick end,level=function() return botLevel end}
+@@ -2344,9 +2353,13 @@
+  if s.lock and flatDir.Magnitude>0.1 and flatDir.Unit:Dot(facing)<-0.3 then speed*=Rules.BackpedalScale end
+  if not owned then
+   s.hum.WalkSpeed=(locked or frozen or pouncing or held) and 0 or s.block and 7 or s.action and 9 or speed
+-  s.hum.JumpPower=(locked or held or s.block or s.action or s.flying) and 0 or 45
++  s.hum.JumpPower=(locked or held or s.block or s.action or s.flying) and 0 or (Rules.Characters[s.hero].JumpPower or 45) -- R66-ui10 per hero
+   -- Server-moved: drive the humanoid from validated intent.
+   s.hum:Move((locked or frozen or pouncing or held or s.flying or (s.isDummy and not botOn())) and Vector3.zero or flatDir,false)
++  -- R66-ui10: the sparring bot climbs like a player (Wraithstep walls, Bulwark ledges) and jumps what it can get over.
++  if s.isDummy and botOn() and not (locked or frozen or pouncing or held or s.flying or s.action) and D.Climb then
++   D.Climb.step(Rules.Climb[s.hero] or Rules.Climb.Default,s.model,s.root,s.hum,flatDir,{autoJump=true})
++  end
+  end
+  if s.block and not owned then
+   local flat=Vector3.new(s.aim.X,0,s.aim.Z)

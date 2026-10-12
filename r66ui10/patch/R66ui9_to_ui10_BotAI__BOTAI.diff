@@ -1,0 +1,87 @@
+--- ../r66ui9/src/BotAI__BOTAI.luau	2026-10-12 23:53:18.227159801 +0000
++++ src/BotAI__BOTAI.luau	2026-10-12 23:53:17.898454076 +0000
+@@ -11,6 +11,8 @@
+ local BotAI = {}
+ 
+ local function rand(r) return math.random(r[1], r[2]) end
++-- R66-ui10: PathfindingService in the game; nil in the offline test.
++local PFS = typeof(game) == "Instance" and game:GetService("PathfindingService") or nil
+ 
+ -- ctx (from Main): Rules, now() = server tick, states, foe(s,t), alive(s), doAction(s,action,data),
+ -- level() = "Easy"/"Normal"/"Hard", clearSight(s,t), flatUnit(v,fallback), groundHeight(s).
+@@ -247,7 +249,8 @@
+ TYPES.Fly = function(ctx, s, ai, e, tac, diff)
+  if s.flying then return nil end
+  if tac.When == "foeFlies" then
+-  if not (e.t.flying and (e.rise or 0) > 6) then return nil end
++  -- R66-ui10: also when the enemy stands high up (on the pyramid).
++  if not ((e.rise or 0) > 6) then return nil end
+   return roll(ai, "fly" .. tostring(math.floor(ctx.now() / 120)), diff.AntiAir) and 0 or nil
+  end
+  if tac.When == "kited" then
+@@ -369,6 +372,46 @@
+  return true
+ end
+ 
++-- R66-ui10 pathfinding (Peter: "check the path finding and the pyramids"). The bot walks straight at the enemy
++-- (Wraithstep climbs walls, Bulwark jumps and pulls up ledges: the Climb module). Only when it is stuck for
++-- 0.75 s, or the enemy is 5+ studs above or below it, does it ask PathfindingService for a route (the pyramid's
++-- stairs) and follow the waypoints, jumping where the path says. A route is reused for 1.5 s, or until the
++-- enemy has moved 10 studs from its end. Computed off the tick (task.spawn), one at a time per bot.
++local function flatDist(a, b) return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude end
++local function navDir(ctx, s, ai, e, want)
++ if not PFS or s.flying then return want end
++ local now = ctx.now()
++ if now - (ai.navCheckAt or -999) >= 45 then
++  local moved = ai.navLastPos and flatDist(s.root.Position, ai.navLastPos) or 99
++  ai.stuck = moved < 1.5 and e.dist > 6
++  ai.navLastPos = s.root.Position; ai.navCheckAt = now
++ end
++ local high = math.abs(e.rise or 0) > 5
++ if not (ai.stuck or high) then ai.path = nil; return want end
++ local goal = e.t.root.Position
++ if not ai.pathBusy and (not ai.path or now >= (ai.pathAt or 0) + 90 or flatDist(ai.pathGoal, goal) > 10) then
++  ai.pathBusy = true
++  local from = s.root.Position
++  local big = (ctx.Rules.Characters[s.hero].Scale or 1) > 1.1
++  task.spawn(function()
++   local path = PFS:CreatePath({AgentRadius = big and 3 or 2.2, AgentHeight = big and 7 or 5.5, AgentCanJump = true, WaypointSpacing = 4})
++   local ok = pcall(function() path:ComputeAsync(from, goal) end)
++   if ok and path.Status == Enum.PathStatus.Success then ai.path = path:GetWaypoints(); ai.wp = 2 else ai.path = nil end
++   ai.pathAt = ctx.now(); ai.pathGoal = goal; ai.pathBusy = false
++   ai.stats.paths = (ai.stats.paths or 0) + 1
++  end)
++ end
++ if ai.path then
++  local wp = ai.path[ai.wp or 2]
++  while wp and flatDist(wp.Position, s.root.Position) < 2.5 do ai.wp += 1; wp = ai.path[ai.wp] end
++  if not wp then ai.path = nil; return want end
++  if wp.Action == Enum.PathWaypointAction.Jump and s.hum.FloorMaterial ~= Enum.Material.Air then s.hum.Jump = true end
++  local d = Vector3.new(wp.Position.X - s.root.Position.X, 0, wp.Position.Z - s.root.Position.Z)
++  if d.Magnitude > 0.1 then return d.Unit end
++ end
++ return want
++end
++
+ -- Movement every tick: keep the kit's range, strafe, step out for a bait, retreat, fly.
+ local function move(ctx, s, ai, e, diff, kit)
+  local now = ctx.now()
+@@ -380,7 +423,8 @@
+  elseif ai.mode == "evade" and now < (ai.modeUntil or 0) then dir = -flat; state = "evading"
+  elseif ai.mode == "sidestep" and now < (ai.modeUntil or 0) then dir = side * (ai.sideSign or 1); state = "sidestepping"
+  elseif now < (ai.retreatUntil or 0) then dir = -flat; state = "retreating"
+- elseif e.dist > (kit.Ideal or 5) + 1.5 then dir = flat; state = "closing in"
++ elseif e.dist > (kit.Ideal or 5) + 1.5 then
++  dir = navDir(ctx, s, ai, e, flat); state = ai.path and "following a path" or "closing in"
+  elseif e.dist < (kit.Min or 2) and roll(ai, "space" .. tostring(math.floor(now / 30)), diff.Spacing) then dir = -flat; state = "making space"
+  else
+   if not ai.strafeAt or now >= ai.strafeAt then
+@@ -393,7 +437,7 @@
+  end
+  if s.flying then
+   -- Flight: match the enemy's height (a little above), land before the energy runs out.
+-  local want = e.t.flying and (e.rise + 3) or -6
++  local want = (e.t.flying or e.rise > 4) and (e.rise + 3) or -6
+   local y = math.clamp(want / 8, -1, 1)
+   dir = Vector3.new(dir.X, y, dir.Z)
+   if (s.energy or 0) <= (kit.LandEnergy or 30) or (not e.t.flying and e.dist < 12 and e.rise > -3) then

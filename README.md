@@ -7,3 +7,4 @@ Start with `HANDOVER_CODEX.md`. Section 10 explains how to merge the R66-ui8 lin
 - `r66/` – R66 base place (.rbxlx) and its script sources.
 - `r66ui/` – R66-ui8 place, sources, diffs against R66 (`patch/`), notes and the swap script.
 - `r66ui9/` – R66-ui9: tactical bot AI (BotAI module + Rules.BotAI kits/difficulty), offline fight sim in `test/`. Notes: `r66ui9/R66ui9_NOTES.md`.
+- `r66ui10/` – R66-ui10: Bulwark higher jump + ledge pull-up, Wraithstep spider climb (Climb module), bot pathfinding on the pyramid. Notes: `r66ui10/R66ui10_NOTES.md`.
