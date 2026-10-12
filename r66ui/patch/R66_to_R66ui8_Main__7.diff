@@ -1,0 +1,348 @@
+--- r66/src/Main__7.luau	2026-10-12 00:09:22.966501000 +0000
++++ r66ui/src/Main__7.luau	2026-10-12 15:45:15.193793000 +0000
+@@ -470,8 +470,11 @@
+  s.flying=false; s.velocity.Enabled=false; s.lastFlight=tick; s.hum.AutoRotate=true
+ end
+ local dummyGen=0 -- R43: bumped by every bot spawn; a slower, older bot spawn that finishes late is dropped
+-local function spawnFighter(player,hero,isDummy,skinId)
++local D
++local function spawnFighter(player,hero,isDummy,skinId,ring)
+  local gen
++ -- R66-ui: isDummy=="practice" is a still practice dummy beside duel ring `ring` (not the sparring bot).
++ local practice=isDummy=="practice"; if practice then isDummy=false end
+  if isDummy then dummyGen+=1; gen=dummyGen end
+  -- v49: the sparring dummy wears its hero's default (Mixamo character) look too; it used to pick a random
+  -- older kit skin, which is why the bot still looked like a Roblox avatar.
+@@ -509,6 +512,7 @@
+  model.Parent=workspace
+  local SPAWN_X={Solarion=-10,Wraithstep=10,Tempest=-18,Bulwark=18}
+  local origin=isDummy and Vector3.new(0,4,spotZ("Dummy",-22)) or Vector3.new(SPAWN_X[hero] or 0,4,spotZ("Player",22))
++ if practice then origin=D.practiceSpot(ring) end
+  -- R65 (Peter: "sometimes the toon is below the ground"): stand the fighter on the real floor under its spot
+  -- (a ray down from just above it), at its own standing height, instead of a fixed height of 4.
+  do
+@@ -546,6 +550,12 @@
+   receivedHits=0,chainExpires=0,blockHeld=false,blockStunned=false,fury=Rules.Fury.Start,gcd=0,shieldUntil=0,
+   hurtbox=hurtbox,hurtWeld=hw,hurtBase={center=(lo+hi)/2,size=hi-lo},hurtState="Stand",history={},inputs={},owned=false,moveDebt=0,snaps=0}
+  nextIndex+=1; s.index=nextIndex
++ if practice then
++  s.isPractice=true; s.practiceRing=ring; model:SetAttribute("Practice",true); model.Name="Practice dummy"
++  -- Heals back to full after 6 s without being hit.
++  local last=s.hum.Health
++  s.hum.HealthChanged:Connect(function(h) if h<last then s.practiceHurtAt=os.clock() end; last=h end)
++ end
+  states[model]=s
+  if player then states[player]=s; player.Character=model end
+  if isDummy then dummy=s end
+@@ -558,6 +568,9 @@
+   task.delay(3,function()
+    if player and player.Parent and states[player]==s then
+     local ok,err=pcall(spawnFighter,player,hero,false,skinId); if not ok then warn(err) end
++   elseif practice and states[model]==s then
++    states[model]=nil; model:Destroy()
++    if D.rings()[ring] then local ok,err=pcall(spawnFighter,nil,hero,"practice",nil,ring); if not ok then warn(err) end end
+    elseif isDummy and states[model]==s then
+     states[model]=nil; model:Destroy()
+     local ok,err=pcall(spawnFighter,nil,hero,true); if not ok then warn(err) end
+@@ -1265,7 +1278,7 @@
+  end
+  hitTargets(s,a)
+ end
+-local validActions={Coach=true,Progress=true,SaveProgress=true,Queue=true,Challenge=true,Accept=true,Block=true,Arena=true,Skill3=true,Interrupt=true,Super=true,BotHero=true,Skin=true,Pause=true,Restart=true,Defensive=true,Bot=true,Light=true,Heavy=true,Skill1=true,Skill2=true,Dash=true,Flight=true,Move=true,Select=true,Jump=true,LoadBinds=true,SaveBinds=true,Reload=true,Preview=true,PickSkin=true,StopFight=true,ResetFight=true}
++local validActions={Vote=true,Leaderboard=true,Coach=true,Progress=true,SaveProgress=true,Queue=true,Challenge=true,Accept=true,Block=true,Arena=true,Skill3=true,Interrupt=true,Super=true,BotHero=true,Skin=true,Pause=true,Restart=true,Defensive=true,Bot=true,Light=true,Heavy=true,Skill1=true,Skill2=true,Dash=true,Flight=true,Move=true,Select=true,Jump=true,LoadBinds=true,SaveBinds=true,Reload=true,Preview=true,PickSkin=true,StopFight=true,ResetFight=true}
+ -- Player keybindings persist in a DataStore. Unpublished places (or Studio without API access) just keep them for the session.
+ local DataStoreService=game:GetService("DataStoreService")
+ local bindStore
+@@ -1432,7 +1445,7 @@
+ -- START FIGHT to duel the sparring bot when it's free. Fighters in a duel can only hurt each other, so
+ -- nobody can interfere; everyone else spars freely or WATCHes a duel. Two players alone in a server still
+ -- start a duel on their own, as before. Fighters are keyed by Player, or by "Bot" for the sparring bot.
+-local D={list={},of={},queue={},challenges={},nextId=0}
++D={list={},of={},queue={},challenges={},nextId=0}
+ local function stateOf(key) if key=="Bot" then return dummy end return states[key] end
+ local function nameOf(key) if key=="Bot" then return "Sparring bot" end return key.DisplayName end
+ local function keyOf(s) if not s then return nil end if s.isDummy then return "Bot" end return s.player end
+@@ -1450,6 +1463,10 @@
+  local a=Rules.Arenas[arenaName]
+  return (a and a.Rings) or {{0,spotZ("Round",10),"x"}}
+ end
++function D.practiceSpot(i)
++ local r=D.rings()[i] or D.rings()[1]
++ return r[3]=="z" and Vector3.new(r[1],4,r[2]+22) or Vector3.new(r[1]+22,4,r[2])
++end
+ function D.freeRing()
+  local used={}; for _,d in D.list do used[d.ring]=true end
+  for i=1,#D.rings() do if not used[i] then return i end end
+@@ -1550,6 +1567,7 @@
+   banner=how.." • "..nameOf(winner).." wins round "..d.number
+   if d.wins[winner]>=Rules.Round.WinsNeeded then
+    banner=nameOf(winner).." wins the match!"; d.matchOver=true
++   D.recordMatch(d,winner)
+    print("[HeroWars] Match won by "..nameOf(winner).." ("..stateOf(winner).hero..")")
+   end
+  else banner=how.." • Draw" end
+@@ -1838,13 +1856,150 @@
+   end
+  end)
+ end
+-remote.OnServerEvent:Connect(function(player,action,data,seq)
++D.handlers={}
++-- R66-ui (Peter: "do a vote for the bots"): with more than one player in the server, changing the arena, the
++-- bot's level or the bot's hero is a vote. YES from more than half the players passes it; 20 s, then it fails.
++-- Alone in a server it happens straight away, as before.
++function D.voteText(kind)
++ if kind=="Arena" then
++  local order=Rules.Arenas.Order; local nxt=order[(table.find(order,arenaName) or 0)%#order+1]
++  return "Change the arena to "..((Rules.Arenas[nxt] and Rules.Arenas[nxt].Title) or nxt).."?"
++ elseif kind=="Bot" then
++  local order=Rules.Bot.Order; local nxt=order[(table.find(order,botLevel) or 0)%#order+1]
++  return nxt=="Off" and "Turn the sparring bot off?" or ("Set the sparring bot to "..nxt.."?")
++ else
++  local heroes=Rules.Bot.Heroes; return "Switch the sparring bot to "..heroes[(table.find(heroes,botHero) or 0)%#heroes+1].."?"
++ end
++end
++function D.needed() return math.floor(#Players:GetPlayers()/2)+1 end
++function D.sendVote()
++ local v=D.vote; if not v then return end
++ local yes=0; for _ in v.yes do yes+=1 end
++ remote:FireAllClients("Vote",{id=v.id,text=v.text,by=v.by.DisplayName,yes=yes,need=D.needed(),left=math.max(0,math.ceil(v.ends-os.clock()))})
++end
++function D.endVote(passed)
++ local v=D.vote; if not v then return end
++ D.vote=nil
++ remote:FireAllClients("VoteEnd",{id=v.id,passed=passed})
++ tellAll((passed and "Vote passed: " or "Vote failed: ")..v.text)
++ if passed and v.by.Parent then D.onServerEvent(v.by,v.kind,nil,nil,true) end
++end
++function D.tallyVote()
++ local v=D.vote; if not v then return end
++ local yes,no=0,0
++ for p in v.yes do if p.Parent then yes+=1 end end
++ for p in v.no do if p.Parent then no+=1 end end
++ local n=#Players:GetPlayers(); local need=D.needed()
++ if yes>=need then D.endVote(true) elseif no>n-need then D.endVote(false) else D.sendVote() end
++end
++function D.askVote(player,kind)
++ if #Players:GetPlayers()<=1 then D.onServerEvent(player,kind,nil,nil,true); return end
++ if D.vote then notify(player,"A vote is already running. Vote on it at the top right."); return end
++ D.voteId=(D.voteId or 0)+1
++ D.vote={id=D.voteId,kind=kind,by=player,text=D.voteText(kind),yes={[player]=true},no={},ends=os.clock()+20}
++ local id=D.voteId
++ D.tallyVote()
++ task.delay(20,function() if D.vote and D.vote.id==id then D.endVote(false) end end)
++end
++function D.castVote(player,yes)
++ local v=D.vote; if not v then return end
++ v.yes[player]=yes or nil; v.no[player]=(not yes) or nil
++ D.tallyVote()
++end
++-- R66-ui: saved wins. Player-vs-player wins and losses plus bot wins, kept in DataStore HeroWarsStats
++-- (key s_<UserId>); PvP wins also go to the OrderedDataStore HeroWarsWins for the all-time leaderboard.
++D.stats={}
++function D.statStores()
++ if D.statStore==nil then
++  local ok,a=pcall(function() return DataStoreService:GetDataStore("HeroWarsStats") end)
++  local ok2,b=pcall(function() return DataStoreService:GetOrderedDataStore("HeroWarsWins") end)
++  D.statStore=ok and a or false; D.winStore=ok2 and b or false
++  if not ok then warn("HeroWars wins will not be saved: "..tostring(a)) end
++ end
++ return D.statStore,D.winStore
++end
++function D.loadStats(player)
++ local st={wins=0,losses=0,botWins=0}
++ D.stats[player]=st
++ local folder=Instance.new("Folder"); folder.Name="leaderstats"
++ local w=Instance.new("IntValue"); w.Name="Wins"; w.Parent=folder
++ local l=Instance.new("IntValue"); l.Name="Losses"; l.Parent=folder
++ folder.Parent=player
++ local store=D.statStores()
++ if store then
++  local ok,saved=pcall(function() return store:GetAsync("s_"..player.UserId) end)
++  if ok and type(saved)=="table" and D.stats[player]==st then
++   st.wins=tonumber(saved.wins) or 0; st.losses=tonumber(saved.losses) or 0; st.botWins=tonumber(saved.botWins) or 0
++  elseif not ok then warn("HeroWars wins not loaded: "..tostring(saved)) end
++ end
++ st.loaded=true
++ w.Value=st.wins; l.Value=st.losses
++end
++function D.saveStats(player,leaving)
++ local st=D.stats[player]; if not st then return end
++ if leaving then D.stats[player]=nil end
++ if not st.loaded or not st.dirty then return end
++ st.dirty=false
++ local store,wins=D.statStores()
++ local uid=player.UserId
++ task.spawn(function()
++  if store then
++   local ok,err=pcall(function() store:SetAsync("s_"..uid,{wins=st.wins,losses=st.losses,botWins=st.botWins}) end)
++   if not ok then warn("HeroWars wins not saved: "..tostring(err)) end
++  end
++  if wins and uid>0 then pcall(function() wins:SetAsync(tostring(uid),st.wins) end) end
++ end)
++end
++function D.recordMatch(d,winner)
++ local a,b=d.fighters[1],d.fighters[2]; local loser=winner==a and b or a
++ local function bump(k,field)
++  if k=="Bot" then return end
++  local st=D.stats[k]; if not st then return end
++  st[field]+=1; st.dirty=true
++  local ls=k:FindFirstChild("leaderstats")
++  if ls and field~="botWins" then local v=ls:FindFirstChild(field=="wins" and "Wins" or "Losses"); if v then v.Value=st[field] end end
++  D.saveStats(k)
++ end
++ if d.bot then bump(winner,"botWins") else bump(winner,"wins"); bump(loser,"losses") end
++end
++-- Leaderboard: this server's players and the all-time top 10 (refreshed at most once a minute).
++D.names={}
++function D.sendBoard(player)
++ local here={}
++ for _,p in Players:GetPlayers() do
++  local st=D.stats[p]
++  table.insert(here,{name=p.DisplayName,wins=st and st.wins or 0,losses=st and st.losses or 0,bot=st and st.botWins or 0,me=p==player})
++ end
++ table.sort(here,function(x,y) return x.wins>y.wins end)
++ local _,wins=D.statStores()
++ if wins and os.clock()-(D.topAt or -100)>60 then
++  D.topAt=os.clock()
++  local ok,page=pcall(function() return wins:GetSortedAsync(false,10):GetCurrentPage() end)
++  if ok then
++   local top={}
++   for _,e in page do
++    local id=tonumber(e.key)
++    local name=id and D.names[id]
++    if id and not name then
++     local ok2,n=pcall(function() return Players:GetNameFromUserIdAsync(id) end)
++     name=ok2 and n or ("Player "..e.key); D.names[id]=name
++    end
++    table.insert(top,{name=name or e.key,wins=e.value})
++   end
++   D.top=top
++  end
++ end
++ remote:FireClient(player,"Board",{here=here,top=D.top or {}})
++end
++local function onServerEvent(player,action,data,seq,data_vote)
+  if type(action)~="string" or not validActions[action] then return end
+  local now=os.clock(); local gate=gates[player]
+  if not gate then gate={tokens=60,time=now}; gates[player]=gate end
+  gate.tokens=math.min(60,gate.tokens+(now-gate.time)*40); gate.time=now
+  if type(seq)~="number" or seq~=seq or seq<0 or seq>2^31 or seq%1~=0 then seq=nil end
+  if gate.tokens<1 then if seq and states[player] then ack(states[player],seq,false) end; return end; gate.tokens-=1
++ if action=="Vote" then D.castVote(player,data==true); return end
++ if action=="Leaderboard" then D.sendBoard(player); return end
+  -- R19 lobby: a look-only copy of any hero in any skin, built once and kept in ReplicatedStorage so the
+  -- lobby can spin it in a viewport. Anchored, no hurtbox, never in the workspace.
+  if action=="Preview" then
+@@ -1925,10 +2080,18 @@
+  -- the player who asked, so they can practise Defensive / Dodge and Interrupt. Only while the bot is in no match,
+  -- the player is in no duel and stands within 22 studs of it; at most once every 2.5 s per player.
+  if action=="Coach" then
+-  if (data~="Swing" and data~="Cast") or D.of.Bot or inDuel(player) or not alive(s) or not alive(dummy) then return end
++  if (data~="Swing" and data~="Cast") or inDuel(player) or not alive(s) then return end
+   if now-(gate.coachAt or -10)<2.5 then return end
++  -- R66-ui: the nearest sparring partner, the bot (when it's in no match) or a practice dummy.
++  local dummy,best=nil,22
++  for key,st in states do
++   if typeof(key)=="Instance" and (st.isPractice or (st.isDummy and not D.of.Bot)) and alive(st) then
++    local dist=(s.root.Position-st.root.Position).Magnitude
++    if dist<=best then dummy,best=st,dist end
++   end
++  end
++  if not dummy then notify(player,"Walk up to the bot or a practice dummy first."); return end
+   local delta=s.root.Position-dummy.root.Position
+-  if delta.Magnitude>22 then notify(player,"Walk up to the bot first."); return end
+   gate.coachAt=now
+   local flat=Vector3.new(delta.X,0,delta.Z)
+   if flat.Magnitude>0.1 then dummy.aim=flat.Unit; dummy.root.CFrame=CFrame.lookAt(dummy.root.Position,dummy.root.Position+flat.Unit) end
+@@ -1951,6 +2114,7 @@
+    notify(player,"Change the bot's hero after its match."); return
+   end
+   if botSwapping then return end
++  if not data_vote then D.askVote(player,action); return end
+   local heroes=Rules.Bot.Heroes
+   botHero=heroes[(table.find(heroes,botHero) or 0)%#heroes+1]
+   remote:FireAllClients("Bot",botLevel,botHero)
+@@ -1964,11 +2128,16 @@
+  if action=="Arena" then
+   -- v32: next arena, when no duel is running (R63: any duel). Everyone goes back to a clear spot.
+   if #D.list>0 then notify(player,"Change the arena when no duels are running."); return end
++  if not data_vote then D.askVote(player,action); return end
+   local order=Rules.Arenas.Order
+   buildArena(order[(table.find(order,arenaName) or 0)%#order+1])
+   local i=0
+   for key,st in states do
+-   if typeof(key)=="Instance" and key:IsA("Model") and alive(st) then
++   if typeof(key)=="Instance" and key:IsA("Model") and st.isPractice then
++    if D.rings()[st.practiceRing] then
++     local o=D.practiceSpot(st.practiceRing); placeAt(st,CFrame.lookAt(o,Vector3.new(0,4,spotZ("Round",0))))
++    else states[key]=nil; key:Destroy() end
++   elseif typeof(key)=="Instance" and key:IsA("Model") and alive(st) then
+     i+=1
+     local origin=st.isDummy and Vector3.new(0,4,spotZ("Dummy",-22)) or Vector3.new(i%2==1 and -12 or 12,4,spotZ("Player",14))
+     placeAt(st,CFrame.lookAt(origin,Vector3.new(0,4,spotZ("Round",0))))
+@@ -1978,6 +2147,7 @@
+   return
+  end
+  if action=="Bot" then
++  if not data_vote then D.askVote(player,action); return end
+   local order=Rules.Bot.Order
+   botLevel=order[(table.find(order,botLevel) or 0)%#order+1]
+   -- Switching the bot off ends its match; never leave the game frozen.
+@@ -1988,6 +2158,8 @@
+  if action=="Pause" then
+   if not inDuel(player) then notify(player,"Pause works during a match."); return end
+   if #D.list>1 and not paused then notify(player,"Pause is off while other duels are running."); return end
++  -- R66-ui: pausing freezes the whole server, so it only works when the two of you are the only players.
++  if not paused then for _,p in Players:GetPlayers() do if not (D.of[p] and D.of[p]==D.of[player]) then notify(player,"Pause is off while other players are in the server."); return end end end
+   -- P during the resume countdown pauses again instead of restarting the count.
+   setPaused(not paused or resuming,player.DisplayName); return
+  end
+@@ -2122,7 +2294,9 @@
+  end
+  -- Queued and applied at the start of the next tick, in arrival order (step A).
+  table.insert(s.inputs,{action,data,seq})
+-end)
++end
++remote.OnServerEvent:Connect(function(player,action,data,seq) onServerEvent(player,action,data,seq,false) end)
++D.onServerEvent=onServerEvent
+ local function update(s)
+  if s.shadowCircle and (not alive(s) or tick>=s.shadowCircle.expires) then s.shadowCircle.visual:Destroy(); s.shadowCircle=nil end
+  -- R47 Solar Absorb: enemies inside the sphere lose health and Solarion gains it.
+@@ -2687,6 +2861,7 @@
+ end)
+ local function onPlayer(player)
+  remote:FireClient(player,"Arena",arenaName)
++ task.spawn(D.loadStats,player)
+  gates[player]={tokens=60,time=os.clock(),spawning=true}
+  local hero=#Players:GetPlayers()%2==1 and "Solarion" or "Wraithstep"
+  local ok,err=pcall(spawnFighter,player,hero,false)
+@@ -2699,8 +2874,29 @@
+  D.challenges[player]=nil; local qi=table.find(D.queue,player); if qi then table.remove(D.queue,qi) end
+  local s=states[player]; if s then states[s.model]=nil; s.model:Destroy() end
+  states[player]=nil; gates[player]=nil
++ if D.vote then D.vote.yes[player]=nil; D.vote.no[player]=nil; task.defer(D.tallyVote) end
++ D.saveStats(player,true)
+ end)
+ for _,player in Players:GetPlayers() do task.spawn(onPlayer,player) end
+ task.spawn(function()
+  local ok,err=pcall(spawnFighter,nil,botHero,true); if not ok then warn("Training dummy: "..tostring(err)) end
+ end)
++-- R66-ui: a still practice dummy beside every duel ring except the first (the sparring bot stands there).
++task.delay(8,function()
++ local heroes={"Bulwark","Tempest","Solarion","Wraithstep"}
++ for i=2,#D.rings() do
++  local ok,err=pcall(spawnFighter,nil,heroes[(i-2)%#heroes+1],"practice",nil,i); if not ok then warn("Practice dummy: "..tostring(err)) end
++ end
++end)
++task.spawn(function()
++ while true do
++  task.wait(1)
++  for key,st in states do
++   if typeof(key)=="Instance" and st.isPractice and alive(st) and os.clock()-(st.practiceHurtAt or 0)>6 and st.hum.Health<st.hum.MaxHealth then
++    st.hum.Health=st.hum.MaxHealth
++   end
++  end
++ end
++end)
++task.spawn(function() while true do task.wait(120); for p in D.stats do D.saveStats(p) end end end)
++game:BindToClose(function() for p in D.stats do D.saveStats(p) end; task.wait(2) end)

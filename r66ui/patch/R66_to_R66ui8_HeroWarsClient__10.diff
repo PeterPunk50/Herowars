@@ -1,0 +1,618 @@
+--- r66/src/HeroWarsClient__10.luau	2026-10-12 00:09:23.043281000 +0000
++++ r66ui/src/HeroWarsClient__10.luau	2026-10-12 17:15:22.936873000 +0000
+@@ -13,14 +13,20 @@
+ -- builds into Previews, each one as it appears, so the lobby and skin changes don't wait on downloads.
+ -- R46: counts what has really finished downloading (Preload.done / Preload.names), so the welcome
+ -- screen can wait for it.
+-local Preload={done=0,names={}}
++local Preload={done=0,names={},paused=game:GetService("UserInputService").TouchEnabled} -- R66-ui7: phones start in Simple looks
+ task.spawn(function()
+  local folder=RS.HeroWars:WaitForChild("Previews",30); if not folder then return end
+  local CP=game:GetService("ContentProvider")
+  local queue={}
+- for _,m in folder:GetChildren() do table.insert(queue,m) end
+- folder.ChildAdded:Connect(function(m) table.insert(queue,m) end)
++ local list={}; for _,m in workspace:GetChildren() do if m:IsA("Model") and m:GetAttribute("Hero") then table.insert(list,m) end end
++ pcall(function() CP:PreloadAsync(list) end) -- R66-ui: the fighters you can see first
++ local function isDefault(m) local h,id=string.match(m.Name,"^(%w+)|(.+)$"); local sk=h and Rules.Skins[h]; return sk and sk.Order[1]==id end
++ local function add(m) if isDefault(m) then table.insert(queue,1,m) else table.insert(queue,m) end end
++ for _,m in folder:GetChildren() do add(m) end
++ folder.ChildAdded:Connect(add)
++ local t0=os.clock()
+  while true do
++  if Preload.paused or (game:GetService("UserInputService").TouchEnabled and os.clock()-t0<20 and queue[1] and not isDefault(queue[1])) then task.wait(0.5); continue end
+   local m=table.remove(queue,1)
+   if m then
+    pcall(function() CP:PreloadAsync({m}) end)
+@@ -72,6 +78,7 @@
+  shell.Position=UDim2.new(1,-12,0,64); shell.Parent=top; panel.Parent=shell
+  local scale=Instance.new("UIScale"); scale.Scale=UIS.TouchEnabled and 1 or 1.2; scale.Parent=shell
+  local function fit()
++  if shell:GetAttribute("TouchFit") then return end -- R66-ui: on phones the tile grid sizes the menu itself (end of file)
+   -- R64c (Peter: "menu off screen on mobile"): size from this ScreenGui's own height, which follows the real
+   -- screen (the camera's viewport size was stale on phones), leaving a margin under the menu.
+   local h=top.AbsoluteSize.Y; if h<50 then h=workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.Y or 700 end
+@@ -110,7 +117,7 @@
+ end
+ setMenuOpen(not UIS.TouchEnabled,true) -- open on desktop, closed on phones and tablets
+ menuToggle.Activated:Connect(function() setMenuOpen(not panel.Parent:GetAttribute("Open")) end)
+-local hud=label("Stats",UDim2.new(),UDim2.fromOffset(260,94),"HEROWARS R66 • loading character…")
++local hud=label("Stats",UDim2.new(),UDim2.fromOffset(260,94),"HEROWARS R66-ui8 • loading character…")
+ hud.Parent=panel; hud.LayoutOrder=1
+ if UIS.TouchEnabled then hud.Visible=false end -- R64d: the stats box is desktop only; phones show HP on the nameplate
+ -- R60 (Peter: "move all centre-screen writing to the side or bottom, or make it see-through and fading"):
+@@ -177,7 +184,11 @@
+ local function fxPart(shape,size,cf,color,transparency,material)
+  local p=Instance.new("Part"); p.Name="Fx"; p.Anchored=true; p.CanCollide=false; p.CanTouch=false; p.CanQuery=false
+  p.CastShadow=false; p.Shape=shape; p.Size=size; p.CFrame=cf; p.Color=color
+- p.Material=material or Enum.Material.Neon; p.Transparency=transparency or 0.15; p.Parent=fxFolder
++ p.Material=material or Enum.Material.Neon; p.Transparency=transparency or 0.15
++ -- R66-ui8: phones draw at most 90 effect parts at once; extra ones still run (tweens, timers) but are never drawn,
++ -- so two big powers landing together (Bulwark quake ~60-85 parts + Solar Hammer) can't spike the frame.
++ if UIS.TouchEnabled and #fxFolder:GetChildren()>=90 then return p end
++ p.Parent=fxFolder
+  return p
+ end
+ local function fadeOut(p,duration,goal)
+@@ -3046,56 +3057,11 @@
+  end
+  -- The Lobby button joins the hero row (top of the side panel since R41).
+  local lb=button("Lobby",heroRow,UDim2.fromOffset(0,0),UDim2.fromOffset(127,40),"Lobby",Color3.fromRGB(150,110,30)); lb.TextSize=16
+- lb.Activated:Connect(function() if lobby.Visible then lobby.Visible=false else open(); if UIS.TouchEnabled then setMenuOpen(false) end end end) -- R64k: on phones the menu closes so it does not cover the lobby
++ lb.Activated:Connect(function() if lobby.Visible then lobby.Visible=false else open() end end) -- R66-ui7: on phones the layout swaps the MENU tiles out while the lobby is open (was: MENU closed) -- R64k: on phones the menu closes so it does not cover the lobby
+  Sig.openLobby=open
+- -- R35 (Peter: "a welcome to HeroWars, give the toons time to load, 5 second delay"): a welcome screen
+- -- shows for 5 seconds while the fighters and skins load, then the lobby opens.
+- task.spawn(function()
+-  local w=Instance.new("Frame"); w.Name="Welcome"; w.Size=UDim2.fromScale(1,1); w.BackgroundColor3=Color3.fromRGB(8,10,20)
+-  w.BackgroundTransparency=0.05; w.ZIndex=50; w.Parent=gui
+-  -- R64j (Peter: "HEROWARS in yellow is too big, fit it to the black background"): the title scales to 80% of the
+-  -- screen width (64 at most) instead of a fixed 64 that ran off phone screens.
+-  local title=Instance.new("TextLabel"); title.BackgroundTransparency=1; title.AnchorPoint=Vector2.new(0.5,0); title.Size=UDim2.new(0.8,0,0,UIS.TouchEnabled and 56 or 90); title.Position=UDim2.new(0.5,0,0.36,UIS.TouchEnabled and 20 or 0)
+-  title.TextScaled=true; do local c=Instance.new("UITextSizeConstraint"); c.MaxTextSize=64; c.Parent=title end
+-  title.Font=Enum.Font.GothamBlack; title.TextSize=64; title.TextColor3=Color3.fromRGB(255,215,90); title.TextStrokeTransparency=0.3
+-  title.Text="WELCOME TO HEROWARS"; title.ZIndex=51; title.TextTransparency=1; title.Parent=w
+-  local sub=Instance.new("TextLabel"); sub.BackgroundTransparency=1; sub.Size=UDim2.new(1,0,0,40); sub.Position=UDim2.fromScale(0,0.36)+UDim2.fromOffset(0,96)
+-  sub.Font=Enum.Font.GothamBold; sub.TextSize=22; sub.TextColor3=Color3.fromRGB(200,205,225); sub.ZIndex=51; sub.Text="Loading heroes…"; sub.Parent=w
+-  local bar=Instance.new("Frame"); bar.AnchorPoint=Vector2.new(0.5,0); bar.Position=UDim2.new(0.5,0,0.36,150); bar.Size=UDim2.fromOffset(360,8)
+-  bar.BackgroundColor3=Color3.fromRGB(40,44,60); bar.BorderSizePixel=0; bar.ZIndex=51; bar.Parent=w
+-  local fill=Instance.new("Frame"); fill.Size=UDim2.fromScale(0,1); fill.BackgroundColor3=Color3.fromRGB(255,215,90); fill.BorderSizePixel=0; fill.ZIndex=52; fill.Parent=bar
+-  TweenService:Create(title,TweenInfo.new(0.8),{TextTransparency=0}):Play()
+-  -- R46 (Peter: "the skins did not preload; load 30% and verify before dropping the screen"): the screen
+-  -- stays up at least 5 s and until 30% of all skin looks AND every hero's default look have finished
+-  -- downloading on this machine (and the fighters already in the arena). 90 s at most, so it never hangs.
+-  local t0=os.clock(); local fightersDone=false
+-  task.spawn(function()
+-   local list={}
+-   for _,m in workspace:GetChildren() do if m:IsA("Model") and m:GetAttribute("Hero") then table.insert(list,m) end end
+-   pcall(function() game:GetService("ContentProvider"):PreloadAsync(list) end)
+-   fightersDone=true
+-  end)
+-  while true do
+-   local pf=RS.HeroWars:FindFirstChild("Previews")
+-   local total=pf and pf:GetAttribute("Total") or 0
+-   local need=math.max(1,math.ceil(total*0.1)) -- R47 (Peter): 10% (was 30%)
+-   local defaults=0
+-   for _,h in {"Solarion","Wraithstep","Tempest","Bulwark"} do
+-    if Preload.names[h.."|"..Rules.Skins[h].Order[1]] then defaults+=1 end
+-   end
+-   local k=total>0 and math.min(Preload.done/need,1) or 0
+-   fill.Size=UDim2.fromScale(math.min(k,(os.clock()-t0)/5),1)
+-   sub.Text=total>0 and string.format("Loading heroes… skins %d/%d ready (%d%% • need 10%%)",Preload.done,total,math.floor(Preload.done/total*100)) or "Loading heroes…"
+-   local ready=total>0 and Preload.done>=need and defaults==4 and fightersDone
+-   if (ready and os.clock()-t0>=5) or os.clock()-t0>=90 then break end
+-   task.wait(0.2)
+-  end
+-  TweenService:Create(w,TweenInfo.new(0.4),{BackgroundTransparency=1}):Play()
+-  for _,x in {title,sub} do TweenService:Create(x,TweenInfo.new(0.4),{TextTransparency=1,TextStrokeTransparency=1}):Play() end
+-  bar.Visible=false
+-  task.wait(0.4); w:Destroy()
+-  open()
+- end)
++ -- R66-ui (Peter: "remove the loading screen at the startup, a fast startup for both"): no welcome screen and no
++ -- lobby on join; you spawn straight into the arena and skins keep downloading in the background. Pick a hero
++ -- from MENU > Lobby. (The R35-R47 welcome screen waited for 10% of the skins, 5 s at least.)
+ end
+ applyBindings()
+ remote:FireServer("LoadBinds")
+@@ -3953,12 +3919,17 @@
+ RunService.RenderStepped:Connect(function(dt)
+  dt=math.min(dt,1/20)
+  local now=os.clock()
++ local cam=workspace.CurrentCamera; local camPos=cam and cam.CFrame.Position or Vector3.zero
++ local swayFar=UIS.TouchEnabled and 60 or 120
+  for model in rigs do
+   if not model.Parent then continue end
+   local list=swayList(model)
+   if #list==0 then continue end
+   local root=model:FindFirstChild("HumanoidRootPart")
+   if not root then continue end
++  -- R66-ui8: cape/armour sway is skipped for fighters far from the camera (120 studs on PC, 60 on phones),
++  -- where nobody can see it; with 12 players and 4 practice dummies that is most rigs most of the time.
++  if (root.Position-camPos).Magnitude>swayFar then continue end
+   local v=root.CFrame:VectorToObjectSpace(root.AssemblyLinearVelocity)
+   local flying=model:GetAttribute("Flying")==true
+   local p=poses[model]
+@@ -3998,6 +3969,7 @@
+  end
+ end)
+ remote.OnClientEvent:Connect(function(kind,a,b,c,d,e,f,g,h,sneakBonus)
++ if kind=="Fx" and Sig.fxFar and Sig.fxFar(a,b,c) then return end -- R66-ui: skip effects from far-off fights
+  if kind=="Notice" then notice.Text=a
+  elseif kind=="Bot" then showBot(a,b)
+  elseif kind=="Arena" then
+@@ -4052,7 +4024,7 @@
+   Sig.vig.level=frac<0.3 and a.health>0 and (0.3-frac)/0.3+0.2 or 0
+   local skill1=Rules.moveName(a.hero,a.hero=="Solarion" and "Skill2" or "Skill1",1)
+   local skill2=Rules.moveName(a.hero,a.hero=="Solarion" and "Skill3" or "Skill2",1)
+-  hud.Text=string.format("R66 • %s • HP %d / %d • Fury %d\nFlight energy %d • %s%s\n%s %.1fs  |  %s %.1fs",a.hero,math.ceil(a.health),math.floor(a.maxHealth or 100),math.floor(a.fury or 0),math.floor(a.energy),a.phase,(a.shield or 0)>0 and " • SHIELD" or "",skill1 or "—",skill1 and a.cooldowns[skill1] or 0,skill2 or "—",skill2 and a.cooldowns[skill2] or 0) -- R30 fix: removed powers are nil
++  hud.Text=string.format("R66-ui8 • %s • HP %d / %d • Fury %d\nFlight energy %d • %s%s\n%s %.1fs  |  %s %.1fs",a.hero,math.ceil(a.health),math.floor(a.maxHealth or 100),math.floor(a.fury or 0),math.floor(a.energy),a.phase,(a.shield or 0)>0 and " • SHIELD" or "",skill1 or "—",skill1 and a.cooldowns[skill1] or 0,skill2 or "—",skill2 and a.cooldowns[skill2] or 0) -- R30 fix: removed powers are nil
+   furyFill.Size=UDim2.fromScale(math.clamp((a.fury or 0)/Rules.Fury.Max,0,1),1)
+   furyText.Text="Fury "..math.floor(a.fury or 0)
+   do
+@@ -4747,20 +4719,22 @@
+   return l
+  end
+  ---------------------------------------------------------------- How to Play card
+- local W,H=touch and 540 or 620,touch and 330 or 400
+- local card=Instance.new("Frame"); card.Name="HowToPlay"; card.AnchorPoint=Vector2.new(0.5,0.5); card.Position=UDim2.fromScale(0.5,0.5)
++ local W,H=touch and 540 or 620,touch and 362 or 424 -- R66-ui6: tall enough for six rows above the buttons (was 330/400)
++ local card=Instance.new("Frame"); card.Name="HowToPlay"; card.AnchorPoint=Vector2.new(0,0); card.Position=UDim2.fromOffset(12,touch and 4 or 8)
+  card.Size=UDim2.fromOffset(W,H); card.BackgroundColor3=Color3.fromRGB(14,18,28); card.BackgroundTransparency=0.04
+  card.Visible=false; card.ZIndex=40; card.Parent=gui; corner(card,UDim.new(0,16))
+  do local st=Instance.new("UIStroke"); st.Color=GOLD; st.Thickness=2; st.Transparency=0.2; st.Parent=card end
+  local fit=Instance.new("UIScale"); fit.Parent=card
+  local function refit()
+   local v=gui.AbsoluteSize; if v.X<10 then return end
+-  fit.Scale=math.min(1,(v.X-24)/W,(v.Y-16)/H)
++  -- R66-ui (Peter: "make it fit, don't take up the centre of the screen"): at most 45% of the screen wide, and
++  -- clear of the bottom row of buttons (100 px on phones). gui sits under Roblox's top bar, so y 4 is just below it.
++  fit.Scale=math.min(1,(v.X*0.45)/W,(v.Y-(touch and 100 or 90))/H)
+  end
+  gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
+  local title=text(card,"HOW TO PLAY",touch and 26 or 32,Enum.Font.GothamBlack,GOLD); title.Position=UDim2.fromOffset(22,12); title.Size=UDim2.new(1,-44,0,36)
+  local sub=text(card,"",14,Enum.Font.GothamMedium,Color3.fromRGB(170,178,200)); sub.Position=UDim2.fromOffset(22,touch and 42 or 50); sub.Size=UDim2.new(1,-44,0,18)
+- local rows=Instance.new("Frame"); rows.BackgroundTransparency=1; rows.Position=UDim2.fromOffset(22,touch and 66 or 78); rows.Size=UDim2.new(1,-44,1,touch and -128 or -146); rows.Parent=card
++ local rows=Instance.new("Frame"); rows.BackgroundTransparency=1; rows.Position=UDim2.fromOffset(22,touch and 66 or 78); rows.Size=UDim2.new(1,-44,1,touch and -132 or -150); rows.Parent=card
+  do local l=Instance.new("UIListLayout"); l.Padding=UDim.new(0,touch and 5 or 8); l.SortOrder=Enum.SortOrder.LayoutOrder; l.Parent=rows end
+  local function cardButton(t,x,w,color)
+   local b=Instance.new("TextButton"); b.AnchorPoint=Vector2.new(0,1); b.Position=UDim2.new(0,x,1,-16); b.Size=UDim2.fromOffset(w,touch and 42 or 46)
+@@ -4789,7 +4763,7 @@
+    row("SKILLS","The round buttons next to ATTACK: "..skills..".",4)
+    local d=name("Defensive")
+    row("DEFENCE",has("Dash") and ("Dodge and "..d.." sit together. "..d.." breaks stuns.") or (d.." is your defence button. It breaks stuns."),5)
+-   row("MENU","Top right: QUEUE or CHALLENGE a player, How to play, Guided fight.",6)
++   row("MENU","Top right: Lobby (pick your hero), QUEUE or CHALLENGE a player, Leaderboard.",6)
+   else
+    local walk=key("MoveForward")..key("MoveLeft")..key("MoveBack")..key("MoveRight")
+    row(walk,"Move. "..key("StrafeLeft").." / "..key("StrafeRight").." strafe, "..key("Rise").." jumps.",1)
+@@ -4799,14 +4773,15 @@
+    row(#ks>0 and table.concat(ks," ") or "—","Skills: "..skills..". Names are on the bar.",4)
+    row((has("Dash") and key("Dash").." / " or "")..key("Defensive"),(has("Dash") and "Dodge. " or "")..name("Defensive").." breaks stuns.",5)
+    row("MENU",
+-    "Top right: QUEUE or CHALLENGE a player, How to play, Guided fight. "..key("Keybinds").." changes keys.",6)
++    "Top right: Lobby (pick your hero), QUEUE or CHALLENGE, Leaderboard. "..key("Keybinds").." changes keys.",6)
+   end
+   goBtn.Text=(G.progress and G.progress.tutorial) and "GUIDED FIGHT AGAIN" or "START GUIDED FIGHT"
+  end
+  local function openCard()
+   fillCard(); refit(); card.Visible=true
+   fit.Scale*=0.94; TS:Create(fit,TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Scale=fit.Scale/0.94}):Play()
+-  if touch then setMenuOpen(false) end
++  -- R66-ui3 (Peter: "it needs to disappear when the menu is shut"): the card belongs to MENU, so MENU opens with it.
++  if not panel.Parent:GetAttribute("Open") then setMenuOpen(true) end
+  end
+  local function closeCard()
+   card.Visible=false
+@@ -4814,6 +4789,10 @@
+   if not G.progress.howto then G.progress.howto=true; save() end
+  end
+  G.openCard=openCard
++ Sig.guide=G -- R66-ui7: the screen layout reads whether a guided fight is running
++ panel.Parent:GetAttributeChangedSignal("Open"):Connect(function()
++  if not panel.Parent:GetAttribute("Open") and card.Visible then closeCard() end
++ end)
+  okBtn.Activated:Connect(closeCard)
+  ---------------------------------------------------------------- Guided fight
+  local box=Instance.new("Frame"); box.Name="GuidedFight"; box.Visible=false
+@@ -4846,11 +4825,15 @@
+  end
+  local function myRoot() local c=player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
+  local function findBot()
++  local best,bh,bd=nil,nil,math.huge; local r=myRoot()
+   for _,m in workspace:GetChildren() do
+-   if m:IsA("Model") and m~=player.Character and m:GetAttribute("Hero") and not Players:GetPlayerFromCharacter(m) then
+-    local h=m:FindFirstChildOfClass("Humanoid"); if h and h.Health>0 then return m,h end
++   if m:IsA("Model") and m~=player.Character and m:GetAttribute("Hero") and not Players:GetPlayerFromCharacter(m) and not m:GetAttribute("DuelId") then
++    local h=m:FindFirstChildOfClass("Humanoid"); local mr=m:FindFirstChild("HumanoidRootPart")
++    local d=(r and mr) and (mr.Position-r.Position).Magnitude or 1e6
++    if h and h.Health>0 and d<bd then best,bh,bd=m,h,d end
+    end
+   end
++  return best,bh
+  end
+  local function botDist()
+   local b=findBot(); local r=myRoot(); local br=b and b:FindFirstChild("HumanoidRootPart")
+@@ -4858,8 +4841,8 @@
+  end
+  local mark=Instance.new("Highlight"); mark.FillTransparency=1; mark.OutlineColor=GOLD; mark.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+  local STEPS={}
+- STEPS[1]={text=function() return touch and "Walk up to the sparring bot (gold outline) with the left stick."
+-   or ("Walk up to the sparring bot (gold outline) with "..key("MoveForward")..key("MoveLeft")..key("MoveBack")..key("MoveRight")..".") end,
++ STEPS[1]={text=function() return touch and "Walk up to the gold-outlined dummy with the left stick."
++   or ("Walk up to the gold-outlined dummy with "..key("MoveForward")..key("MoveLeft")..key("MoveBack")..key("MoveRight")..".") end,
+   done=function() return botDist()<14 end}
+  STEPS[2]={text=function() return touch and "Tap the bot to target it." or ("Click the bot, or press "..key("TargetNext")..", to target it.") end,
+   done=function() return currentTarget~=nil end}
+@@ -4962,14 +4945,21 @@
+   end)
+  end
+  G.start=startGuide
+- goBtn.Activated:Connect(function() closeCard(); startGuide() end)
++ goBtn.Activated:Connect(function() closeCard(); G.menuShutAt=os.clock(); setMenuOpen(false); startGuide() end) -- R66-ui4: the fight starts with MENU shut
+  skip.Activated:Connect(stop)
++ -- R66-ui4 (Peter: "all should go when MENU is clicked again"): shutting MENU also ends the guided fight and
++ -- closes the keybinds list, so nothing MENU opened stays on screen.
++ panel.Parent:GetAttributeChangedSignal("Open"):Connect(function()
++  if panel.Parent:GetAttribute("Open") then return end
++  if G.active and os.clock()-(G.menuShutAt or -10)>0.5 then stop() end
++  local kb=gui:FindFirstChild("Keybindings"); if kb then kb.Visible=false end
++ end)
+  -- MENU: How to play and Guided fight, always there (tiles on phones).
+  do
+   local hb=button("HowToButton",panel,UDim2.new(),UDim2.fromOffset(260,38),"How to play",Color3.fromRGB(150,110,30)); hb.LayoutOrder=2
+-  hb.Activated:Connect(function() if touch then setMenuOpen(false) end; openCard() end)
++  hb.Activated:Connect(function() if card.Visible then closeCard() else openCard() end end)
+   local gb=button("GuideButton",panel,UDim2.new(),UDim2.fromOffset(260,38),"Guided fight",Color3.fromRGB(150,110,30)); gb.LayoutOrder=2
+-  gb.Activated:Connect(function() if G.active then stop() else startGuide() end end)
++  gb.Activated:Connect(function() if G.active then stop() else G.menuShutAt=os.clock(); setMenuOpen(false); startGuide() end end)
+  end
+  -- First join: ask the server what this player has seen, then open the card once the welcome screen and the
+  -- lobby have closed and the fighter is standing.
+@@ -4989,6 +4979,117 @@
+   end
+  end)
+ end)()
++;(function()
++ -- R66-ui: a vote bar (arena / bot changes need YES from more than half the server) and a leaderboard.
++ local touch=UIS.TouchEnabled
++ local GOLD=Color3.fromRGB(255,205,80)
++ local function corner(o,r) local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,r or 10); c.Parent=o end
++ ---------------------------------------------------------------- vote bar (top right, under MENU's row)
++ local bar=Instance.new("Frame"); bar.Name="VoteBar"; bar.AnchorPoint=Vector2.new(1,0)
++ bar.Position=UDim2.new(1,-12,0,60); bar.Size=UDim2.fromOffset(290,48) -- right edge, far from the centre
++ bar.BackgroundColor3=Color3.fromRGB(20,26,44); bar.BackgroundTransparency=0.1; bar.Visible=false; bar.ZIndex=30; bar.Parent=menuToggle.Parent
++ corner(bar,10)
++ do local st=Instance.new("UIStroke"); st.Color=GOLD; st.Transparency=0.4; st.Parent=bar end
++ local txt=Instance.new("TextLabel"); txt.BackgroundTransparency=1; txt.Position=UDim2.fromOffset(8,2); txt.Size=UDim2.fromOffset(164,44)
++ txt.Font=Enum.Font.GothamBold; txt.TextScaled=true; txt.TextWrapped=true; txt.TextColor3=Color3.new(1,1,1); txt.TextXAlignment=Enum.TextXAlignment.Left; txt.ZIndex=31; txt.Parent=bar
++ do local c=Instance.new("UITextSizeConstraint"); c.MaxTextSize=13; c.MinTextSize=8; c.Parent=txt end
++ local yes=button("VoteYes",bar,UDim2.fromOffset(176,8),UDim2.fromOffset(56,32),"YES",Color3.fromRGB(40,120,60)); yes.ZIndex=31; yes.TextSize=13
++ local no=button("VoteNo",bar,UDim2.fromOffset(236,8),UDim2.fromOffset(50,32),"NO",Color3.fromRGB(120,45,45)); no.ZIndex=31; no.TextSize=13
++ corner(yes,8); corner(no,8)
++ local cur,voted=nil,false
++ yes.Activated:Connect(function() voted=true; yes.BackgroundTransparency=0.5; no.BackgroundTransparency=0.5; remote:FireServer("Vote",true) end)
++ no.Activated:Connect(function() voted=true; yes.BackgroundTransparency=0.5; no.BackgroundTransparency=0.5; remote:FireServer("Vote",false) end)
++ ---------------------------------------------------------------- leaderboard (left side, never the centre)
++ local board=Instance.new("Frame"); board.Name="Leaderboard"; board.Position=UDim2.fromOffset(12,touch and 4 or 8)
++ board.Size=UDim2.fromOffset(touch and 250 or 280,touch and 230 or 300); board.BackgroundColor3=Color3.fromRGB(14,18,28); board.BackgroundTransparency=0.06
++ board.Visible=false; board.ZIndex=35; board.Parent=gui; corner(board,14)
++ do local st=Instance.new("UIStroke"); st.Color=GOLD; st.Thickness=2; st.Transparency=0.2; st.Parent=board end
++ local bscale=Instance.new("UIScale"); bscale.Parent=board
++ local function refit() local v=gui.AbsoluteSize; if v.Y>50 then bscale.Scale=math.min(1,(v.Y-(touch and 100 or 90))/board.Size.Y.Offset,(v.X*0.4)/board.Size.X.Offset) end end
++ gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit); refit()
++ local head=Instance.new("TextLabel"); head.BackgroundTransparency=1; head.Position=UDim2.fromOffset(14,8); head.Size=UDim2.new(1,-60,0,26)
++ head.Font=Enum.Font.GothamBlack; head.TextSize=touch and 18 or 22; head.TextColor3=GOLD; head.TextXAlignment=Enum.TextXAlignment.Left; head.Text="LEADERBOARD"; head.ZIndex=36; head.Parent=board
++ local close=button("CloseBoard",board,UDim2.new(1,-42,0,8),UDim2.fromOffset(32,28),"X",Color3.fromRGB(70,40,40)); close.ZIndex=36; corner(close,8)
++ local body=Instance.new("TextLabel"); body.BackgroundTransparency=1; body.Position=UDim2.fromOffset(14,40); body.Size=UDim2.new(1,-28,1,-48)
++ body.Font=Enum.Font.GothamMedium; body.TextSize=touch and 12 or 14; body.TextColor3=Color3.fromRGB(230,234,245); body.RichText=true
++ body.TextXAlignment=Enum.TextXAlignment.Left; body.TextYAlignment=Enum.TextYAlignment.Top; body.TextWrapped=true; body.ZIndex=36; body.Parent=board
++ body.Text="Loading…"
++ close.Activated:Connect(function() board.Visible=false end)
++ panel.Parent:GetAttributeChangedSignal("Open"):Connect(function() if not panel.Parent:GetAttribute("Open") then board.Visible=false end end)
++ local lb=button("LeaderboardButton",panel,UDim2.new(),UDim2.fromOffset(260,38),"Leaderboard",Color3.fromRGB(150,110,30)); lb.LayoutOrder=2
++ lb.Activated:Connect(function()
++  if board.Visible then board.Visible=false; return end
++  local htp=gui:FindFirstChild("HowToPlay"); if htp then htp.Visible=false end
++  refit(); board.Visible=true; body.Text="Loading…"; remote:FireServer("Leaderboard")
++ end)
++ ---------------------------------------------------------------- R66-ui7 looks: Simple or 3D
++ -- Peter: "a toon skin still, and a button to load the 3D skins separately". Simple: other fighters show their
++ -- hero-coloured base body (skin meshes hidden on this screen only) and no other skins are downloaded. 3D: full
++ -- skins, and the rest of the skins download in the background. Phones start Simple, PCs 3D. Your own fighter
++ -- always wears its real look.
++ local R15={Head=1,UpperTorso=1,LowerTorso=1,LeftUpperArm=1,LeftLowerArm=1,LeftHand=1,RightUpperArm=1,RightLowerArm=1,RightHand=1,
++  LeftUpperLeg=1,LeftLowerLeg=1,LeftFoot=1,RightUpperLeg=1,RightLowerLeg=1,RightFoot=1}
++ local simple=touch
++ local function kitOf(d,m)
++  local o=d
++  while o and o~=m do if o:GetAttribute("KitPiece") then return true end; o=o.Parent end
++  return false
++ end
++ local function look(m)
++  if not (m:IsA("Model") and m:GetAttribute("Hero")) or m==player.Character then return end
++  local on=simple
++  for _,d in m:GetDescendants() do
++   if d:IsA("BasePart") then
++    if kitOf(d,m) then d.LocalTransparencyModifier=on and 1 or 0
++    elseif R15[d.Name] and d.Parent==m then
++     if on then
++      if d:GetAttribute("ToonOrig")==nil then d:SetAttribute("ToonOrig",d.Transparency) end
++      d.Transparency=0
++     elseif d:GetAttribute("ToonOrig")~=nil then d.Transparency=d:GetAttribute("ToonOrig"); d:SetAttribute("ToonOrig",nil) end
++    end
++   elseif d:IsA("Highlight") and kitOf(d,m) then d.Enabled=not on end
++  end
++ end
++ local watched={}
++ local function watch(m)
++  if watched[m] or not (m:IsA("Model") and m:GetAttribute("Hero")) then return end
++  watched[m]=true
++  local queued=false
++  m.DescendantAdded:Connect(function() if queued then return end; queued=true; task.delay(0.3,function() queued=false; if m.Parent then look(m) end end) end)
++  m.AncestryChanged:Connect(function() if not m.Parent then watched[m]=nil end end)
++  look(m)
++ end
++ for _,m in workspace:GetChildren() do watch(m) end
++ workspace.ChildAdded:Connect(function(m) task.defer(watch,m) end)
++ local looksBtn=button("LooksButton",panel,UDim2.new(),UDim2.fromOffset(260,38),"",Color3.fromRGB(60,70,110)); looksBtn.LayoutOrder=2
++ local function setLooksText() looksBtn.Text=simple and "Looks: Simple (tap for 3D skins)" or "Looks: 3D skins (tap for Simple)" end
++ setLooksText()
++ looksBtn.Activated:Connect(function()
++  simple=not simple; Preload.paused=simple; setLooksText()
++  for m in watched do if m.Parent then look(m) end end
++  notice.Text=simple and "Simple looks: faster, no extra skin downloads." or "3D skins on: skins download in the background."
++ end)
++ local function esc(t) return (tostring(t):gsub("&","&amp;"):gsub("<","&lt;"):gsub(">","&gt;")) end
++ remote.OnClientEvent:Connect(function(kind,a)
++  if kind=="Vote" and type(a)=="table" then
++   if cur~=a.id then cur=a.id; voted=a.by==player.DisplayName; yes.BackgroundTransparency=voted and 0.5 or 0; no.BackgroundTransparency=voted and 0.5 or 0 end
++   txt.Text=string.format("%s wants: %s  YES %d/%d • %ds",tostring(a.by),tostring(a.text),a.yes or 0,a.need or 0,a.left or 0)
++   bar.Visible=true
++  elseif kind=="VoteEnd" and type(a)=="table" then
++   if cur==a.id then bar.Visible=false; cur=nil end
++  elseif kind=="Board" and type(a)=="table" then
++   local lines={"<b>THIS SERVER</b>  wins / losses (PvP) • bot wins"}
++   for i,e in a.here or {} do
++    local l=string.format("%d. %s  %d / %d • %d",i,esc(e.name),e.wins or 0,e.losses or 0,e.bot or 0)
++    table.insert(lines,e.me and ('<font color="#FFCD50">'..l.."</font>") or l)
++   end
++   table.insert(lines,""); table.insert(lines,"<b>ALL-TIME TOP 10</b>  PvP wins")
++   if #(a.top or {})==0 then table.insert(lines,"(saved wins show here once the game is published)") end
++   for i,e in a.top or {} do table.insert(lines,string.format("%d. %s  %d",i,esc(e.name),e.wins or 0)) end
++   body.Text=table.concat(lines,"\n")
++  end
++ end)
++end)()
+ -- R64 (Peter: "classy, fade, modern style"): menu, challenge and lobby buttons get rounded glass styling:
+ -- a soft top-to-bottom sheen, a thin light edge that brightens on hover, and a quick fade-in when shown.
+ -- Wrapped in its own function: the main chunk is at Luau's 200-local limit (R64 crashed on load in Studio).
+@@ -5046,7 +5147,7 @@
+  -- and shrinks to fit. The row frames are emptied into the grid; the duel list and stats box stay hidden.
+  if UIS.TouchEnabled then
+   local ORDER={"Lobby","HowToButton","GuideButton","PauseButton","ButtonLayout","RestartButton","StopButton","ResetFightButton",
+-   "QueueButton","ChallengeButton","WatchButton","SkinButton","BotButton","BotHeroButton","ArenaButton","ReloadButton"}
++   "QueueButton","ChallengeButton","WatchButton","LeaderboardButton","LooksButton","SkinButton","BotButton","BotHeroButton","ArenaButton","ReloadButton"}
+   local list=panel:FindFirstChildOfClass("UIListLayout"); if list then list:Destroy() end
+   for i,name in ORDER do
+    local b=panel:FindFirstChild(name,true)
+@@ -5061,6 +5162,45 @@
+   end
+   local grid=Instance.new("UIGridLayout"); grid.CellSize=UDim2.fromOffset(80,64); grid.CellPadding=UDim2.fromOffset(6,6)
+   grid.SortOrder=Enum.SortOrder.LayoutOrder; grid.FillDirectionMaxCells=3; grid.Parent=panel
++  -- R66-ui (Peter: "the menu box needs to fit all, so none are cut off"): the grid picks its column count and
++  -- tile size from the real screen so every tile shows at once, with no scrolling. It tries 3 columns first, then
++  -- 4, 5, 6, keeping tiles at least 50 px tall; only on a very short screen do the tiles shrink below that (to 34).
++  local shell=panel.Parent; local top=shell.Parent
++  shell:SetAttribute("TouchFit",true)
++  local sc=shell:FindFirstChildOfClass("UIScale"); if sc then sc.Scale=1 end
++  panel.ScrollBarThickness=0
++  local GAP,INNER,TOPY,BOTTOM=6,12,64,10 -- tile gap, panel padding (6 each side), menu top, margin under it
++  local function fitTiles()
++   local v=top.AbsoluteSize; if v.Y<50 then local cam=workspace.CurrentCamera; v=cam and cam.ViewportSize or Vector2.new(900,400) end
++   if sc then sc.Scale=1 end
++   local n=0
++   for _,ch in panel:GetChildren() do if ch:IsA("TextButton") and ch.Visible then n+=1 end end
++   n=math.max(n,1)
++   local availH=v.Y-TOPY-BOTTOM-INNER
++   local availW=v.X-24-INNER-6
++   local cols,cellH
++   for c=3,6 do
++    local rows=math.ceil(n/c); local h=math.floor((availH-GAP*(rows-1))/rows)
++    cols,cellH=c,h
++    if h>=50 then break end
++   end
++   cellH=math.clamp(cellH,34,64)
++   local cellW=math.clamp(math.floor((availW-GAP*(cols-1))/cols),56,cellH>=50 and 84 or 76)
++   grid.FillDirectionMaxCells=cols; grid.CellSize=UDim2.fromOffset(cellW,cellH)
++   local rows=math.ceil(n/cols)
++   local w=cols*cellW+GAP*(cols-1)+INNER+6
++   local h=rows*cellH+GAP*(rows-1)+INNER
++   shell.Size=UDim2.fromOffset(w,math.min(h,math.max(80,v.Y-TOPY-BOTTOM)))
++   -- Scrolling is only a fallback if even 34 px tiles in 6 columns can't fit.
++   panel.ScrollingEnabled=h>v.Y-TOPY-BOTTOM
++  end
++  fitTiles()
++  top:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitTiles)
++  if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitTiles) end
++  for _,ch in panel:GetChildren() do
++   if ch:IsA("TextButton") then ch:GetPropertyChangedSignal("Visible"):Connect(fitTiles) end
++  end
++  shell:GetAttributeChangedSignal("Open"):Connect(function() if shell:GetAttribute("Open") then fitTiles() end end)
+  end
+  under(panel.Parent,true,true)
+  style(menuToggle,true)
+@@ -5076,3 +5216,173 @@
+   end)
+  end
+ end)()
++-- R66-ui2 fix (Peter's phone screenshot: the How to Play card showed as a dark box with its text hidden): this
++-- ScreenGui draws by global ZIndex, so the card (ZIndex 40) and the guided-fight box (30) covered their own text and
++-- buttons (ZIndex 1). Everything inside them now sits one level above its parent, including rows added later.
++;(function()
++ local function lift(root)
++  if not root then return end
++  local function set(o)
++   if not o:IsA("GuiObject") then return end
++   local p=o.Parent; local base=0
++   while p and p~=root.Parent do if p:IsA("GuiObject") then base=math.max(base,p.ZIndex) end; p=p.Parent end
++   if p==root.Parent and o~=root then o.ZIndex=math.max(o.ZIndex,base+1) end
++  end
++  for _,d in root:GetDescendants() do set(d) end
++  root.DescendantAdded:Connect(set)
++ end
++ lift(gui:FindFirstChild("HowToPlay")); lift(gui:FindFirstChild("GuidedFight"))
++end)()
++-- R66-ui5/ui6 (Peter: "the menu screens should be movable, with a 0.4 s check so no mistake moves happen"):
++-- How to Play, Leaderboard, Guided fight, Keybindings, the controls hint line and the notice line can be dragged.
++-- Press and hold on the panel (not on a button) for 0.4 s without moving more than 8 px: the edge turns white and
++-- the panel follows your finger or mouse until you let go. A tap, a button press or a swipe never moves it.
++-- ui6: presses are read from UserInputService (ui5 listened on the frames, whose text covered them, so nothing moved).
++;(function()
++ local HOLD,SLOP=0.4,8
++ local list={}
++ local function shown(o)
++  if o:IsA("TextLabel") and o.TextTransparency>0.5 and o.BackgroundTransparency>0.9 then return false end -- a faded-out notice
++  while o and o:IsA("GuiObject") do if not o.Visible then return false end; o=o.Parent end; return true
++ end
++ local function inside(o,p) local a,z=o.AbsolutePosition,o.AbsoluteSize; return p.X>=a.X and p.Y>=a.Y and p.X<=a.X+z.X and p.Y<=a.Y+z.Y end
++ local function onButton(root,p)
++  for _,d in root:GetDescendants() do
++   if (d:IsA("GuiButton") or d:IsA("TextBox")) and shown(d) and inside(d,p) then return true end
++  end
++  return false
++ end
++ local function place(f,abs)
++  local par=f.Parent; if not (par and par:IsA("GuiBase2d")) then return end
++  local ps,sz=par.AbsoluteSize,f.AbsoluteSize
++  local x=math.clamp(abs.X-par.AbsolutePosition.X,0,math.max(0,ps.X-sz.X))
++  local y=math.clamp(abs.Y-par.AbsolutePosition.Y,0,math.max(0,ps.Y-sz.Y))
++  f.Position=UDim2.fromOffset(x+f.AnchorPoint.X*sz.X,y+f.AnchorPoint.Y*sz.Y)
++ end
++ local press,target,startPos,startAbs,dragging,token=nil,nil,nil,nil,false,0
++ local function lift(f,on)
++  local st=f:FindFirstChildOfClass("UIStroke")
++  if not st then st=Instance.new("UIStroke"); st.Name="DragEdge"; st.Thickness=2; st.Transparency=1; st.Parent=f end
++  if on then st:SetAttribute("C",st.Color); st:SetAttribute("T",st.Transparency); st.Color=Color3.new(1,1,1); st.Transparency=0
++  else if st:GetAttribute("C") then st.Color=st:GetAttribute("C"); st.Transparency=st:GetAttribute("T") end end
++ end
++ local function finish() if dragging and target then lift(target,false); target:SetAttribute("Dragged",true) end; press=nil; target=nil; dragging=false; token+=1 end
++ UIS.InputBegan:Connect(function(io)
++  if press or (io.UserInputType~=Enum.UserInputType.MouseButton1 and io.UserInputType~=Enum.UserInputType.Touch) then return end
++  local p=Vector2.new(io.Position.X,io.Position.Y)
++  local best
++  for _,f in list do
++   if f.Parent and shown(f) and inside(f,p) and (not best or f.ZIndex>best.ZIndex) then best=f end
++  end
++  if not best or onButton(best,p) then return end
++  press=io; target=best; startPos=p; startAbs=best.AbsolutePosition; dragging=false
++  token+=1; local mine=token
++  task.delay(HOLD,function() if token==mine and press then dragging=true; lift(target,true) end end)
++ end)
++ UIS.InputChanged:Connect(function(io)
++  if not press then return end
++  local same=io==press or (press.UserInputType==Enum.UserInputType.MouseButton1 and io.UserInputType==Enum.UserInputType.MouseMovement)
++  if not same then return end
++  local d=Vector2.new(io.Position.X,io.Position.Y)-startPos
++  if not dragging then if d.Magnitude>SLOP then finish() end; return end -- moved too soon: a swipe, not a hold
++  place(target,startAbs+d)
++ end)
++ UIS.InputEnded:Connect(function(io)
++  if press and (io==press or (press.UserInputType==Enum.UserInputType.MouseButton1 and io.UserInputType==Enum.UserInputType.MouseButton1)) then finish() end
++ end)
++ for _,n in {"HowToPlay","Leaderboard","GuidedFight","Keybindings","Controls","Notice"} do
++  local f=gui:FindFirstChild(n)
++  if f then
++   table.insert(list,f)
++   if f:IsA("Frame") then f.Active=true end -- the panel takes the touch, so the camera doesn't turn under it
++   if f.Parent:IsA("GuiBase2d") then f.Parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() task.defer(place,f,f.AbsolutePosition) end) end
++   f:GetPropertyChangedSignal("Visible"):Connect(function() if f.Visible then task.defer(place,f,f.AbsolutePosition) end end)
++  end
++ end
++end)()
++-- R66-ui7 screen layout (Peter: "better screen management for the guides and menu, the fight commentary overlaps the
++-- guides"). Rules, checked 10 times a second:
++--  * Left column, top down: the round line (fight commentary), then the guided-fight box, then the notice line.
++--    Nothing in the column overlaps; a panel you dragged by hand keeps its spot.
++--  * While a big panel is open (Lobby, Keybindings, How to Play, Leaderboard) the guided-fight box steps aside.
++--  * Phones: one screen at a time. Opening How to Play, Leaderboard or the Lobby from MENU swaps the MENU tiles out;
++--    closing it (GOT IT / X / WEAR) brings the tiles back. Tapping MENU shuts everything.
++;(function()
++ local touch=UIS.TouchEnabled
++ local shell=panel.Parent
++ local function vis(n) local f=gui:FindFirstChild(n); return f and f.Visible end
++ local function showing(l) return l and l.Visible and (l.TextTransparency<0.9) end
++ local held={} -- the guide box we hid, so we can bring it back
++ local acc=0
++ RunService.Heartbeat:Connect(function(dt)
++  acc+=dt; if acc<0.1 then return end; acc=0
++  local box=gui:FindFirstChild("GuidedFight"); local G=Sig.guide
++  local bigPanel=vis("Lobby") or vis("Keybindings") or vis("HowToPlay") or vis("Leaderboard")
++  if box and G then
++   if G.active and bigPanel and box.Visible then box.Visible=false; held.box=true
++   elseif held.box and (not G.active) then held.box=nil
++   elseif held.box and not bigPanel then box.Visible=true; held.box=nil end
++  end
++  -- left column
++  local y=touch and 6 or 8
++  if showing(roundLabel) then roundLabel.Position=UDim2.fromOffset(12,y); y+=roundLabel.AbsoluteSize.Y+6 end
++  if box and box.Visible and not box:GetAttribute("Dragged") then
++   if touch then box.Position=UDim2.fromOffset(12,y) else box.Position=UDim2.new(0,12,0.4,0) end
++   y=box.AbsolutePosition.Y-gui.AbsolutePosition.Y+box.AbsoluteSize.Y+6
++  end
++  if not notice:GetAttribute("Dragged") then
++   local def=gui.AbsoluteSize.Y*(touch and 0.48 or 0.62)
++   notice.Position=UDim2.fromOffset(12,math.max(def,y))
++  end
++  -- phones: one screen at a time
++  if touch and shell:GetAttribute("Open") then
++   local want=not (vis("HowToPlay") or vis("Leaderboard") or vis("Lobby"))
++   if shell.Visible~=want then shell.Visible=want end
++  end
++ end)
++end)()
++-- R66-ui phone performance (knowledge/HeroWars/LIVE_CHECK_2026-10-12.md, items 3 and 4).
++-- Own function: the main chunk is at Luau's 200-local limit.
++;(function()
++ local Lighting=game:GetService("Lighting")
++ -- 1. Effects from fights far away aren't drawn. Only pure one-off bursts are skipped; effects that change how a
++ -- fighter looks for a while (Shield, Parry, Vanish, Armor, Glitch, Snare, casts, Solar Absorb, Cancel) always run.
++ local BURST={Pulse=true,Super=true,Interrupted=true,ShadowStep=true,Teleport=true,DoorSlam=true,HolyRing=true,
++  ShieldThrow=true,Riposte=true,WallSplat=true,Shockwave=true,Drain=true,Heal=true,Shade=true,Absorb=true,
++  ShieldBreak=true,Zap=true,CircleBurn=true,Quake=true,SolarFlare=true,TitanDropLand=true,PounceLand=true,Dash=true}
++ local FAR=140 -- studs; a duel ring is well inside this, so your own fight and the one you WATCH always show
++ Sig.fxFar=function(model,kind,pos)
++  if not BURST[kind] then return false end
++  if typeof(model)=="Instance" and model==player.Character then return false end
++  local at=typeof(pos)=="Vector3" and pos or nil
++  if not at then
++   local r=typeof(model)=="Instance" and model:FindFirstChild("HumanoidRootPart")
++   if not r then return false end
++   at=r.Position
++  end
++  local cam=workspace.CurrentCamera
++  if cam and (cam.Focus.Position-at).Magnitude<FAR then return false end
++  if cam and (cam.CFrame.Position-at).Magnitude<FAR then return false end
++  local me=player.Character and player.Character:FindFirstChild("HumanoidRootPart")
++  if me and (me.Position-at).Magnitude<FAR then return false end
++  return true
++ end
++ -- 2. Phone graphics profile: no depth of field, no sun rays, and lights don't cast shadows on touch screens.
++ -- (Lighting stays Future: Technology can't be changed from a script, only in the place file.)
++ if not UIS.TouchEnabled then return end
++ local function tame(d)
++  if d:IsA("DepthOfFieldEffect") or d:IsA("SunRaysEffect") then
++   d.Enabled=false
++   d:GetPropertyChangedSignal("Enabled"):Connect(function() if d.Enabled then d.Enabled=false end end)
++  elseif d:IsA("PointLight") or d:IsA("SpotLight") or d:IsA("SurfaceLight") then
++   d.Shadows=false
++   d:GetPropertyChangedSignal("Shadows"):Connect(function() if d.Shadows then d.Shadows=false end end)
++  end
++ end
++ for _,d in Lighting:GetDescendants() do tame(d) end
++ Lighting.DescendantAdded:Connect(tame)
++ for _,d in workspace:GetDescendants() do if d:IsA("Light") then tame(d) end end
++ workspace.DescendantAdded:Connect(function(d) if d:IsA("Light") then tame(d) end end)
++ Lighting.ShadowSoftness=0 -- sharp shadows are cheaper to draw
++ print("[HeroWars] phone graphics profile on: no DoF, no sun rays, no light shadows, far effects skipped")
++end)()
