@@ -2,7 +2,7 @@
 
 Peter asked: "tone down the bot: make Easy a lot lower and double the time taken to react or even more; Normal can be Easy and Normal Hard."
 
-**Build:** `HeroWars_V47_R66ui11b.rbxlx` (label R66-ui11b). Only Rules and the version label changed. Not play-tested yet.
+**Build:** `HeroWars_V47_R66ui11c.rbxlx` (label R66-ui11c). Only Rules and the version label changed. Not play-tested yet.
 
 | | New Easy | New Normal (= old Easy) | New Hard (= old Normal) |
 |---|---|---|---|
@@ -18,14 +18,13 @@ Peter asked: "tone down the bot: make Easy a lot lower and double the time taken
 
 The old Hard (learns your rhythm, baits spam) is gone. Damage, health and speed are the same on every level.
 
-## R66-ui11b: Earth Slam cooldown (Peter: "reduce the cd on Bulwark's big attack but don't let him spam")
+## R66-ui11c: Titan Cleave cooldown (Peter: "reduce the cd on Bulwark's big attack but don't let him spam", then "no, his spam attack button")
 
-His big attack is taken to be Earth Slam (key 2). Titan Cleave is already 1 s.
-- **Cooldown:** 3 s, down from 5 s.
-- **Anti-spam:** each Slam used within 6 s of it coming ready waits 1.5 s longer, so spammed Slams go 3 s, 4.5 s, then 6 s.
-- **Reset:** it resets to 3 s after 6 s without a Slam.
-- **Unchanged:** it still costs 35 Fury, triggers the GCD and stuns for 0.8 s under the stun diminishing returns.
-- **Mechanism:** the same ramp as Solar Hammer and Whirlwind (`RampStep 90`, `RampMax 360`, `RampReset 360`).
+- **Earth Slam is unchanged:** still 5 s. Peter rejected the ui11b Slam change.
+- **Titan Cleave (key 1):** cooldown 0.6 s, down from 1 s, so the first swings come out quicker. The swing itself takes about 0.8 s.
+- **Anti-spam:** each Cleave used within 1.5 s of it coming ready waits 0.2 s longer, up to 1.2 s. Mashing it ends up a little slower than before.
+- **Reset:** a 1.5 s pause resets it.
+- **Mechanism:** the same ramp as Solar Hammer and Whirlwind (`Cooldown 36`, `RampStep 12`, `RampMax 72`, `RampReset 90`).
 
 **Sim against simple attack spam** (`test/RESULTS.md`), wins out of 16:
 - Easy: 0-4.
