@@ -1,0 +1,20 @@
+--- ../r66ui9/src/Rules__3.luau	2026-10-12 23:53:18.419964956 +0000
++++ src/Rules__3.luau	2026-10-12 23:53:17.913868225 +0000
+@@ -997,6 +997,17 @@
+   }},
+  },
+ }
++-- R66-ui10 climbing (Peter, 2026-10-12: "make sure Bulwark's jump is increased so he can get up the steps; Wraith
++-- has spider climb, it comes up but he doesn't have to press the button; Bulwark climbs up if he is short in his
++-- jump; the pyramid walls are high and give flyers too much advantage"). The centre pyramid's tiers are 3.8 studs
++-- high with 1.7-stud ledges; its stairs are 0.8 studs a step. Used by ReplicatedStorage.HeroWars.Climb.
++-- JumpPower: 45 jumps about 5.2 studs; 55 about 7.7 (enough for a tier with room to spare).
++Rules.Characters.Bulwark.JumpPower = 55
++Rules.Climb = {
++ Default = {},                                        -- other heroes: bots still jump walls they can get over
++ Bulwark = {Mantle = 3.5},                            -- in the air at a ledge up to 3.5 studs above his feet: pulls up
++ Wraithstep = {Wall = true, Speed = 14, Mantle = 4},  -- spider climb: walking into a wall climbs it, no button
++}
+ function Rules.canInterrupt(move,cast,frame,damage,result)
+  return move.Interrupt==true and damage>0 and result~="Block" and cast~=nil
+   and cast.Cast==true and frame>=0 and frame<=cast.Startup

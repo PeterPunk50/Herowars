@@ -1,0 +1,25 @@
+--- ../r66ui10/src/Rules__3.luau	2026-10-12 23:53:24.288381000 +0000
++++ src/Rules__3.luau	2026-10-13 00:14:51.528003000 +0000
+@@ -902,15 +902,17 @@
+   -- Learn: remembers the enemy's rhythm and baits spam. Bait: chance to bait when it does.
+   -- Reserve: keeps Fury for its anti-air move against a flying hero. Respect: chance to hold back from
+   -- hitting into a Shield Parry, a Whirlwind spin or a Solar Shield. Spacing: chance to keep its range.
+-  Easy = {React = {30, 48}, Think = {24, 36}, Defend = 0.2, Counter = 0.25, Combo = {1, 2}, AntiAir = 0.25,
++  -- R66-ui11 (Peter, 2026-10-13: "tone down the bot"): Easy is new and much weaker, with reactions about twice
++  -- as slow as the old Easy; Normal is the old Easy; Hard is the old Normal.
++  Easy = {React = {60, 96}, Think = {48, 72}, Defend = 0.08, Counter = 0.1, Combo = {1, 1}, AntiAir = 0.1,
++   Interrupt = 0.05, Trinket = 0.1, Noise = 160, Mistake = 0.45, Learn = false, Bait = 0, Reserve = false,
++   Respect = 0, Spacing = 0.15},
++  Normal = {React = {30, 48}, Think = {24, 36}, Defend = 0.2, Counter = 0.25, Combo = {1, 2}, AntiAir = 0.25,
+    Interrupt = 0.15, Trinket = 0.25, Noise = 120, Mistake = 0.3, Learn = false, Bait = 0, Reserve = false,
+    Respect = 0.1, Spacing = 0.3},
+-  Normal = {React = {18, 30}, Think = {12, 20}, Defend = 0.5, Counter = 0.6, Combo = {2, 3}, AntiAir = 0.6,
++  Hard = {React = {18, 30}, Think = {12, 20}, Defend = 0.5, Counter = 0.6, Combo = {2, 3}, AntiAir = 0.6,
+    Interrupt = 0.5, Trinket = 0.6, Noise = 50, Mistake = 0.1, Learn = false, Bait = 0, Reserve = true,
+    Respect = 0.6, Spacing = 0.7},
+-  Hard = {React = {12, 18}, Think = {6, 12}, Defend = 0.7, Counter = 0.85, Combo = {3, 4}, AntiAir = 0.85,
+-   Interrupt = 0.8, Trinket = 0.85, Noise = 20, Mistake = 0.03, Learn = true, Bait = 0.6, Reserve = true,
+-   Respect = 0.9, Spacing = 0.9},
+  },
+  -- Strategy kits. Ideal / Min = the range it likes and the closest it lets an enemy stay. Use = the button.
+  -- Type says what the tactic waits for (see BotAI for each):
