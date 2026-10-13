@@ -117,7 +117,7 @@ local function setMenuOpen(open,instant)
 end
 setMenuOpen(not UIS.TouchEnabled,true) -- open on desktop, closed on phones and tablets
 menuToggle.Activated:Connect(function() setMenuOpen(not panel.Parent:GetAttribute("Open")) end)
-local hud=label("Stats",UDim2.new(),UDim2.fromOffset(260,94),"HEROWARS R66-ui11 • loading character…")
+local hud=label("Stats",UDim2.new(),UDim2.fromOffset(260,94),"HEROWARS R66-ui11b • loading character…")
 hud.Parent=panel; hud.LayoutOrder=1
 if UIS.TouchEnabled then hud.Visible=false end -- R64d: the stats box is desktop only; phones show HP on the nameplate
 -- R60 (Peter: "move all centre-screen writing to the side or bottom, or make it see-through and fading"):
@@ -4024,7 +4024,7 @@ remote.OnClientEvent:Connect(function(kind,a,b,c,d,e,f,g,h,sneakBonus)
   Sig.vig.level=frac<0.3 and a.health>0 and (0.3-frac)/0.3+0.2 or 0
   local skill1=Rules.moveName(a.hero,a.hero=="Solarion" and "Skill2" or "Skill1",1)
   local skill2=Rules.moveName(a.hero,a.hero=="Solarion" and "Skill3" or "Skill2",1)
-  hud.Text=string.format("R66-ui11 • %s • HP %d / %d • Fury %d\nFlight energy %d • %s%s\n%s %.1fs  |  %s %.1fs",a.hero,math.ceil(a.health),math.floor(a.maxHealth or 100),math.floor(a.fury or 0),math.floor(a.energy),a.phase,(a.shield or 0)>0 and " • SHIELD" or "",skill1 or "—",skill1 and a.cooldowns[skill1] or 0,skill2 or "—",skill2 and a.cooldowns[skill2] or 0) -- R30 fix: removed powers are nil
+  hud.Text=string.format("R66-ui11b • %s • HP %d / %d • Fury %d\nFlight energy %d • %s%s\n%s %.1fs  |  %s %.1fs",a.hero,math.ceil(a.health),math.floor(a.maxHealth or 100),math.floor(a.fury or 0),math.floor(a.energy),a.phase,(a.shield or 0)>0 and " • SHIELD" or "",skill1 or "—",skill1 and a.cooldowns[skill1] or 0,skill2 or "—",skill2 and a.cooldowns[skill2] or 0) -- R30 fix: removed powers are nil
   furyFill.Size=UDim2.fromScale(math.clamp((a.fury or 0)/Rules.Fury.Max,0,1),1)
   furyText.Text="Fury "..math.floor(a.fury or 0)
   do

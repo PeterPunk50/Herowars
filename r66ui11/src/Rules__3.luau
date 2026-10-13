@@ -825,6 +825,11 @@ Rules.Tempest.ZapDamage = 3
 Rules.Defensives.Solarion.Cooldown = 840
 -- Bulwark Earth Slam: no 40% roll; every hit stuns a fixed 0.8 s (under the 1 s diminishing-returns line).
 do local m = Rules.HeroMoves.Bulwark.Slam; m.StunChance = nil; m.ChanceStun = nil; m.Stun = 48 end
+-- R66-ui11 (Peter, 2026-10-13: "reduce the cd on Bulwark's big attack but don't let him spam"): Earth Slam
+-- cooldown 3 s (was 5 s). Each Slam used within 6 s of it coming ready waits 1.5 s longer, up to 6 s, so spammed
+-- Slams go 3 s, 4.5 s, 6 s. It still costs 35 Fury.
+do local m = Rules.HeroMoves.Bulwark.Slam; m.Cooldown = 180; m.RampStep = 90; m.RampMax = 360; m.RampReset = 360 end
+table.clear(heroMoveCache)
 -- Diminishing returns: Lightning Snare (root) and Whirlwind (cyclone) each count on their own, apart from stuns.
 function Rules.drGroup(move) return move.Snare and "Root" or move.Whirl and "Cyclone" or "Stun" end
 table.clear(heroMoveCache)

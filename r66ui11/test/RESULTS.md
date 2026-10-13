@@ -1,4 +1,4 @@
-# Bot AI offline test (R66-ui11 difficulty)
+# Bot AI offline test (R66-ui11b)
 Each row: averages per fight (60 s max). Threats avoided = player attacks started with the bot in reach that didn't land.
 
 ## 1. Attack spam (player presses the same attack every 22 ticks in melee)
@@ -36,50 +36,50 @@ Each row: averages per fight (60 s max). Threats avoided = player attacks starte
 ## 3. Retreating player (kites at 25-32 studs and casts)
 | Bot | Level | Threats avoided | Defends | Evades | Punishes | Anti-air | Interrupts | Baits | Avg react (ticks) | Dmg dealt/taken | Wins |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Bulwark | Easy | 26% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 50 / 139 | 0/8 |
-| Bulwark | Normal | 26% | 0.2 | 0.6 | 0.4 | 0.0 | 0.2 | 0.0 | 57 | 40 / 141 | 0/8 |
-| Bulwark | Hard | 29% | 0.5 | 3.4 | 1.4 | 0.0 | 0.9 | 0.0 | 31 | 49 / 138 | 2/8 |
-| Tempest | Easy | 42% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 84 / 80 | 4/8 |
-| Tempest | Normal | 43% | 0.4 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 57 | 90 / 62 | 4/8 |
-| Tempest | Hard | 76% | 0.6 | 0.8 | 1.6 | 0.0 | 0.1 | 0.0 | 33 | 106 / 24 | 8/8 |
-| Solarion | Easy | 28% | 0.1 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 94 / 106 | 3/8 |
-| Solarion | Normal | 45% | 0.1 | 0.1 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 105 / 67 | 7/8 |
-| Solarion | Hard | 44% | 0.6 | 0.4 | 1.9 | 0.0 | 0.0 | 0.0 | 23 | 108 / 50 | 8/8 |
-| Wraithstep | Easy | 58% | 0.1 | 0.0 | 0.5 | 0.0 | 0.0 | 0.0 | 71 | 55 / 111 | 0/8 |
-| Wraithstep | Normal | 74% | 0.1 | 0.0 | 1.6 | 0.0 | 0.0 | 0.0 | 39 | 105 / 58 | 7/8 |
-| Wraithstep | Hard | 91% | 0.4 | 1.4 | 5.0 | 0.0 | 0.0 | 0.0 | 36 | 109 / 13 | 8/8 |
+| Bulwark | Easy | 27% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 53 / 140 | 0/8 |
+| Bulwark | Normal | 28% | 0.6 | 0.8 | 0.1 | 0.0 | 0.2 | 0.0 | 60 | 59 / 139 | 1/8 |
+| Bulwark | Hard | 25% | 1.0 | 2.9 | 0.4 | 0.0 | 0.9 | 0.0 | 44 | 45 / 138 | 1/8 |
+| Tempest | Easy | 51% | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 89 / 66 | 5/8 |
+| Tempest | Normal | 52% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 100 / 59 | 7/8 |
+| Tempest | Hard | 72% | 0.4 | 1.6 | 1.2 | 0.0 | 0.0 | 0.0 | 43 | 97 / 35 | 7/8 |
+| Solarion | Easy | 35% | 0.2 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 97 / 102 | 4/8 |
+| Solarion | Normal | 52% | 0.0 | 0.2 | 0.2 | 0.0 | 0.0 | 0.0 | 0 | 107 / 54 | 8/8 |
+| Solarion | Hard | 45% | 0.4 | 1.2 | 1.1 | 0.0 | 0.0 | 0.0 | 24 | 106 / 47 | 8/8 |
+| Wraithstep | Easy | 52% | 0.0 | 0.0 | 0.5 | 0.0 | 0.0 | 0.0 | 0 | 55 / 112 | 0/8 |
+| Wraithstep | Normal | 72% | 0.2 | 0.4 | 1.6 | 0.0 | 0.0 | 0.0 | 42 | 108 / 65 | 8/8 |
+| Wraithstep | Hard | 75% | 0.4 | 1.0 | 4.6 | 0.0 | 0.0 | 0.0 | 24 | 100 / 36 | 7/8 |
 
 ## 4. Casting player (channels Solar Hammer / Lightning at 12-18)
 | Bot | Level | Threats avoided | Defends | Evades | Punishes | Anti-air | Interrupts | Baits | Avg react (ticks) | Dmg dealt/taken | Wins |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Bulwark | Easy | 22% | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 100 / 63 | 5/8 |
-| Bulwark | Normal | 39% | 0.6 | 0.0 | 0.2 | 0.0 | 0.1 | 0.0 | 36 | 111 / 50 | 7/8 |
-| Bulwark | Hard | 71% | 0.8 | 0.6 | 1.8 | 0.0 | 0.1 | 0.0 | 41 | 111 / 19 | 8/8 |
-| Tempest | Easy | 50% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 118 / 30 | 8/8 |
-| Tempest | Normal | 67% | 0.4 | 0.2 | 0.5 | 0.0 | 0.0 | 0.0 | 38 | 114 / 15 | 8/8 |
-| Tempest | Hard | 90% | 0.1 | 0.0 | 1.0 | 0.0 | 0.0 | 0.0 | 24 | 114 / 3 | 8/8 |
-| Solarion | Easy | 33% | 0.2 | 0.1 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 111 / 54 | 7/8 |
-| Solarion | Normal | 51% | 0.4 | 0.0 | 0.4 | 0.0 | 0.0 | 0.0 | 34 | 112 / 25 | 8/8 |
-| Solarion | Hard | 69% | 0.9 | 1.8 | 1.4 | 0.0 | 0.0 | 0.0 | 36 | 114 / 7 | 8/8 |
-| Wraithstep | Easy | 52% | 0.0 | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 61 | 98 / 52 | 5/8 |
-| Wraithstep | Normal | 91% | 0.1 | 0.2 | 1.0 | 0.0 | 0.0 | 0.0 | 52 | 113 / 4 | 8/8 |
-| Wraithstep | Hard | 100% | 0.1 | 0.0 | 2.6 | 0.0 | 0.0 | 0.0 | 20 | 115 / 0 | 8/8 |
+| Bulwark | Easy | 26% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 110 / 58 | 6/8 |
+| Bulwark | Normal | 41% | 0.5 | 0.2 | 0.4 | 0.0 | 0.1 | 0.0 | 43 | 118 / 50 | 8/8 |
+| Bulwark | Hard | 67% | 1.0 | 1.0 | 1.0 | 0.0 | 0.5 | 0.0 | 48 | 110 / 22 | 8/8 |
+| Tempest | Easy | 47% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 116 / 36 | 8/8 |
+| Tempest | Normal | 79% | 0.1 | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 48 | 116 / 8 | 8/8 |
+| Tempest | Hard | 87% | 0.2 | 0.1 | 2.1 | 0.0 | 0.0 | 0.0 | 26 | 118 / 4 | 8/8 |
+| Solarion | Easy | 25% | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 102 / 62 | 4/8 |
+| Solarion | Normal | 70% | 0.5 | 0.1 | 0.1 | 0.0 | 0.0 | 0.0 | 37 | 113 / 14 | 8/8 |
+| Solarion | Hard | 63% | 0.8 | 1.9 | 1.5 | 0.0 | 0.0 | 0.0 | 32 | 113 / 12 | 8/8 |
+| Wraithstep | Easy | 55% | 0.1 | 0.1 | 0.1 | 0.0 | 0.0 | 0.0 | 77 | 102 / 52 | 5/8 |
+| Wraithstep | Normal | 89% | 0.4 | 0.2 | 1.2 | 0.0 | 0.0 | 0.0 | 59 | 114 / 5 | 8/8 |
+| Wraithstep | Hard | 96% | 0.1 | 0.2 | 4.6 | 0.0 | 0.0 | 0.0 | 20 | 114 / 1 | 8/8 |
 
 ## 5. Low health (bot starts at 25% vs spam)
 | Bot | Level | Threats avoided | Defends | Evades | Punishes | Anti-air | Interrupts | Baits | Avg react (ticks) | Dmg dealt/taken | Wins |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Bulwark | Easy | 18% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 17 / 36 | 0/16 |
-| Bulwark | Normal | 22% | 0.0 | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 0 | 21 / 36 | 0/16 |
-| Bulwark | Hard | 28% | 0.3 | 0.1 | 0.9 | 0.0 | 0.0 | 0.0 | 22 | 24 / 36 | 0/16 |
-| Tempest | Easy | 30% | 0.3 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 26 / 32 | 0/16 |
-| Tempest | Normal | 37% | 0.5 | 0.0 | 0.2 | 0.0 | 0.0 | 0.0 | 0 | 60 / 29 | 4/16 |
-| Tempest | Hard | 38% | 1.4 | 0.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0 | 105 / 15 | 12/16 |
-| Solarion | Easy | 23% | 0.2 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 26 / 36 | 0/16 |
-| Solarion | Normal | 28% | 0.4 | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 0 | 37 / 33 | 1/16 |
-| Solarion | Hard | 41% | 0.8 | 0.1 | 1.8 | 0.0 | 0.0 | 0.0 | 18 | 69 / 32 | 2/16 |
-| Wraithstep | Easy | 65% | 0.2 | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 30 | 16 / 28 | 0/16 |
-| Wraithstep | Normal | 66% | 0.4 | 0.1 | 0.6 | 0.0 | 0.0 | 0.0 | 32 | 44 / 28 | 0/16 |
-| Wraithstep | Hard | 63% | 0.9 | 0.2 | 1.9 | 0.0 | 0.0 | 0.0 | 31 | 64 / 25 | 4/16 |
+| Bulwark | Easy | 19% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 20 / 36 | 0/16 |
+| Bulwark | Normal | 31% | 0.1 | 0.0 | 0.2 | 0.0 | 0.0 | 0.0 | 33 | 28 / 35 | 1/16 |
+| Bulwark | Hard | 16% | 0.3 | 0.0 | 0.4 | 0.0 | 0.0 | 0.0 | 21 | 14 / 36 | 0/16 |
+| Tempest | Easy | 25% | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 22 / 31 | 1/16 |
+| Tempest | Normal | 36% | 0.2 | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 0 | 48 / 28 | 3/16 |
+| Tempest | Hard | 38% | 1.4 | 0.0 | 1.6 | 0.0 | 0.0 | 0.0 | 43 | 102 / 16 | 10/16 |
+| Solarion | Easy | 20% | 0.1 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0 | 22 / 34 | 0/16 |
+| Solarion | Normal | 36% | 0.6 | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 0 | 55 / 33 | 1/16 |
+| Solarion | Hard | 39% | 0.8 | 0.1 | 1.3 | 0.0 | 0.0 | 0.0 | 18 | 58 / 31 | 2/16 |
+| Wraithstep | Easy | 69% | 0.2 | 0.0 | 0.1 | 0.0 | 0.0 | 0.0 | 2 | 22 / 28 | 0/16 |
+| Wraithstep | Normal | 66% | 0.4 | 0.0 | 0.6 | 0.0 | 0.0 | 0.0 | 70 | 54 / 23 | 4/16 |
+| Wraithstep | Hard | 58% | 0.7 | 0.1 | 1.9 | 0.0 | 0.0 | 0.0 | 39 | 55 / 22 | 4/16 |
 
 ## Cost
-BotAI.think: 5.9 microseconds per server tick on average (457283 ticks, this machine, plain Luau).
+BotAI.think: 5.6 microseconds per server tick on average (458373 ticks, this machine, plain Luau).
