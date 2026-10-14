@@ -1,0 +1,134 @@
+{
+  "name": "HeroEngine_Phase0_Test",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "HeroEngine": {
+        "$className": "Folder",
+        "Core": {
+          "$path": "HeroEngine/Core"
+        },
+        "RobloxAdapters": {
+          "$path": "HeroEngine/RobloxAdapters"
+        }
+      },
+      "HeroWarsGame": {
+        "$className": "Folder",
+        "LegacyRules": {
+          "$path": "HeroWarsGame/LegacyRules.luau"
+        },
+        "Characters": {
+          "$path": "HeroWarsGame/Characters"
+        }
+      },
+      "HeroWars": {
+        "$className": "Folder",
+        "Rules": {
+          "$path": "../r66ui11/src/Rules__3.luau"
+        }
+      }
+    },
+    "ServerScriptService": {
+      "Phase0Server": {
+        "$path": "TestPlace/Server/Phase0Server.server.luau"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Phase0Client": {
+          "$path": "TestPlace/Client/Phase0Client.client.luau"
+        }
+      },
+      "StarterCharacterScripts": {
+        "Health": {
+          "$path": "TestPlace/Character/Health.server.luau"
+        }
+      }
+    },
+    "Workspace": {
+      "Baseplate": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [
+            256,
+            20,
+            256
+          ],
+          "CFrame": {
+            "CFrame": {
+              "position": [
+                0,
+                -10,
+                0
+              ],
+              "orientation": [
+                [
+                  1,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            }
+          },
+          "Color": [
+            0.39,
+            0.42,
+            0.45
+          ],
+          "Material": "Concrete",
+          "TopSurface": "Smooth"
+        }
+      },
+      "SpawnLocation": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Anchored": true,
+          "Size": [
+            6,
+            1,
+            6
+          ],
+          "CFrame": {
+            "CFrame": {
+              "position": [
+                0,
+                0.5,
+                20
+              ],
+              "orientation": [
+                [
+                  1,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            }
+          },
+          "Neutral": true,
+          "TopSurface": "Smooth"
+        }
+      }
+    }
+  }
+}

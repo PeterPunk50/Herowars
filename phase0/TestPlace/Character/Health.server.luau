@@ -1,0 +1,2 @@
+-- Replaces Roblox's default "Health" script, which slowly regenerates every character. In the Phase 0 test the
+-- engine owns health, so nothing else may change it.
