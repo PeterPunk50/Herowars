@@ -65,6 +65,11 @@ function Inst:SetAttribute(k, v) self._attrs[k] = v end
 function Inst:GetAttribute(k) return self._attrs[k] end
 function Inst:IsA(c) return self.ClassName == c end
 function Inst:PivotTo(c) self._kids.HumanoidRootPart.CFrame = c end
+function Inst:GetPivot() return self._kids.HumanoidRootPart.CFrame end
+function Inst:FindFirstChildOfClass(c) for _, k in self._kids do if k.ClassName == c then return k end end return nil end
+function Inst:GetChildren() local t = {}; for _, k in self._kids do table.insert(t, k) end return t end
+function Inst:Destroy() self.Parent = nil; rawset(self, "_destroyed", true) end
+function Inst:Clone() return assert(rawget(self, "_cloneFn"), "no clone for " .. self.Name)() end
 function Inst:FireClient(p, ...) table.insert(MOCK_LOG, {to = p.Name, args = {...}}) end
 function Inst:FireAllClients(...) table.insert(MOCK_LOG, {to = "all", args = {...}}) end
 local Instance = {new = function(className)
@@ -79,7 +84,13 @@ local Players = inst("Players"); Players.PlayerAdded = signal(); Players.PlayerR
 function Players:GetPlayers() return self._list end
 local RunService = inst("RunService"); RunService.Heartbeat = signal()
 function RunService:IsServer() return true end
-local services = {ReplicatedStorage = ReplicatedStorage, Players = Players, RunService = RunService, Workspace = workspace}
+local ServerStorage = inst("ServerStorage")
+local RigsFolder = inst("Folder", "Rigs", ServerStorage)
+local MAKE_CHAR -- set by the tail: builds a character model with a Humanoid and HumanoidRootPart
+local rigTemplate = inst("Model", "HW_Bulwark", RigsFolder)
+rigTemplate._cloneFn = function() return MAKE_CHAR("HW_Bulwark") end
+local services = {ReplicatedStorage = ReplicatedStorage, Players = Players, RunService = RunService, Workspace = workspace,
+ ServerStorage = ServerStorage}
 local game = {GetService = function(_, n) return assert(services[n], n) end}
 local task = {wait = function() end, delay = function() end, spawn = function(f) f() end}
 local function warn(...) print("WARN", ...) end

@@ -1,5 +1,6 @@
 -- HeroEngine Phase 0 integration test (client). Sends only requests; shows what the server decided.
--- Keys: 1 = combo (Sun Jab, Flare Cross, Corona Kick), 2 = Solar Hammer / Grave Scythe, R = reset the test.
+-- Keys: 1 = combo (Sun Jab, Flare Cross, Corona Kick), 2 = Solar Hammer / Grave Scythe, 3 = next rigged body,
+-- R = reset the test.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -33,8 +34,8 @@ local function healthLine()
 end
 local function redraw()
  local hero = player:GetAttribute("Hero") or "?"
- local how = hero == "Solarion" and "Press 1 to jab Wraithstep (2 = Solar Hammer). R resets."
-  or hero == "Wraithstep" and "Stand still and let Solarion hit you (1/2 hit back). R resets."
+ local how = hero == "Solarion" and "Press 1 to jab Wraithstep (2 = Solar Hammer). 3 = next rig body. R resets."
+  or hero == "Wraithstep" and "Stand still and let Solarion hit you (1/2 hit back). 3 = next rig body. R resets."
   or "Spectating: only two fighters in this test."
  panel.Text = string.format("HeroEngine Phase 0 test   You are: %s\n%s\n%s\nResult: %s\n\n%s", hero, how, healthLine(),
   tostring(workspace:GetAttribute("Phase0Result")), table.concat(lines, "\n"))
@@ -57,6 +58,7 @@ UserInputService.InputBegan:Connect(function(input, typing)
  if typing then return end
  if input.KeyCode == Enum.KeyCode.One then net.request("Use", {input = "Light"})
  elseif input.KeyCode == Enum.KeyCode.Two then net.request("Use", {input = "Heavy"})
+ elseif input.KeyCode == Enum.KeyCode.Three then net.request("Body", {})
  elseif input.KeyCode == Enum.KeyCode.R then net.request("Reset", {})
  end
 end)

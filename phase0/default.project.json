@@ -129,6 +129,11 @@
           "TopSurface": "Smooth"
         }
       }
+    },
+    "ServerStorage": {
+      "Rigs": {
+        "$path": "TestPlace/Rigs"
+      }
     }
   }
 }

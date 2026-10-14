@@ -22,7 +22,7 @@ phase0/
 |---|---|
 | Engine tests | `LUAU=/path/to/luau bash phase0/HeroEngine/Tests/run.sh` |
 | Server script against a Roblox mock | `LUAU=/path/to/luau python3 phase0/HeroEngine/Tests/run_server_mock.py` |
-| Build the test place | `cd phase0 && rojo build . -o HeroEngine_Phase0_Test.rbxlx` (Rojo 7.4) |
+| Build the test place | `cd phase0 && rojo build . -o HeroEngine_Phase0_Test.rbxlx` (Rojo 7.6 or newer; 7.4 cannot read the rig files) |
 
 The Luau CLI is from https://github.com/luau-lang/luau/releases, and Rojo is from https://github.com/rojo-rbx/rojo/releases.
 

@@ -24,6 +24,15 @@ local CONFIG = {Solarion = require(Game.Characters.Solarion), Wraithstep = requi
 local SPOT = {Solarion = CFrame.lookAt(Vector3.new(0, 3, 8), Vector3.new(0, 3, 0)),
  Wraithstep = CFrame.lookAt(Vector3.new(0, 3, 4), Vector3.new(0, 3, 12))}
 local INPUTS = {Light = true, Heavy = true}
+-- Rig check: key 3 cycles your body through the rigged models in ServerStorage.Rigs (Peter's Import 3D meshes,
+-- made Studio-ready by rigging/tools/fix_studio_import.py) and back to your own avatar. Looks only: your hero,
+-- health and abilities stay the same.
+local Rigs = game:GetService("ServerStorage"):WaitForChild("Rigs")
+local BODIES = {}
+for _, m in Rigs:GetChildren() do table.insert(BODIES, m.Name) end
+table.sort(BODIES)
+local bodyIndex = {} -- player -> 0 (own avatar) .. #BODIES
+local swapping = {} -- player -> true while a body swap keeps the same fighter
 
 local heroOf = {} -- player -> hero name
 local fighterOf = {} -- player -> engine fighter
@@ -60,6 +69,16 @@ local function onCharacter(player, char)
  if not hero then return end
  local hum = char:WaitForChild("Humanoid")
  local root = char:WaitForChild("HumanoidRootPart")
+ local old = fighterOf[player]
+ if old and old.model == char then return end -- already bound (CharacterAdded and the swap both call this)
+ if swapping[player] and old then
+  -- Same fighter, new body: keep health, cooldowns and state.
+  old.model, old.root, old.hum = char, root, hum
+  hum.MaxHealth = old.maxHp; hum.Health = old.hp; hum.BreakJointsOnDeath = false
+  char:SetAttribute("Hero", hero)
+  return
+ end
+ bodyIndex[player] = 0
  local f = CharacterStats.new(player.UserId, CONFIG[hero])
  f.player, f.model, f.root, f.hum = player, char, root, hum
  fighterOf[player] = f
@@ -142,6 +161,38 @@ net = NetworkService.server("HeroEngine", {
    local a = f.config.Abilities[why]
    net.broadcast("Attack", {model = f.model, title = a.Title, startup = CombatRules.seconds(a.Startup)})
   end
+ end,
+ Body = function(player)
+  local f = fighterOf[player]
+  local old = player.Character
+  if not f or not old or f.hp <= 0 or #BODIES == 0 or swapping[player] then return end
+  local i = ((bodyIndex[player] or 0) + 1) % (#BODIES + 1)
+  bodyIndex[player] = i
+  local at = old:GetPivot()
+  swapping[player] = true
+  local char
+  if i == 0 then
+   swapping[player] = nil
+   bodyIndex[player] = 0
+   player:LoadCharacter() -- back to the player's own avatar (a fresh fighter at full health)
+   log(player.Name .. " is back in their own avatar")
+   return
+  end
+  char = Rigs[BODIES[i]]:Clone()
+  char.Name = player.Name
+  local hum = char:FindFirstChildOfClass("Humanoid")
+  hum.RequiresNeck = false -- the import names the neck joint HeadMotor6D, not Neck
+  hum.BreakJointsOnDeath = false
+  local animate = old:FindFirstChild("Animate")
+  if animate then animate:Clone().Parent = char end -- Roblox's default walk/idle animations
+  char.PrimaryPart = char:FindFirstChild("HumanoidRootPart")
+  char:PivotTo(at)
+  char.Parent = workspace
+  player.Character = char
+  onCharacter(player, char)
+  old:Destroy()
+  swapping[player] = nil
+  log(string.format("%s (%s) is now wearing %s", player.Name, f.hero, BODIES[i]))
  end,
  Reset = function(player)
   -- Test convenience: everyone back to full health on their spot.
