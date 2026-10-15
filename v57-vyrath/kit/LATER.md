@@ -1,0 +1,19 @@
+# Vyrath dragon kit: not possible yet, to do at a later date (2026-10-15)
+
+Nothing below can be done now. Each item says what blocks it and what has to happen first.
+
+| # | Not possible yet | Blocked by | Pick it up when |
+|---|---|---|---|
+| 1 | Milestone 2: greybox dragon rig with idle, walk and turn | Peter has not approved silhouettes, the four six-panel storyboards, the bone hierarchy or the deformation test plan | All four design packages are approved, then authorise milestone 2 separately |
+| 2 | Usable dragon rig | Started 2026-10-15 (Peter's go-ahead): Tripo generated Vyrath and rigged it as a quadruped, see `RIG_NOTES.md`. Skeleton fixed and extended in Blender the same day (parents, mirrored wings, 4-bone hind legs, 12 tail and 8 neck bones, jaw, sockets, paw IK; see `RIG_NOTES.md`), then a fourth wing digit and a neck-base weight fix (v4; neck is clean, wing-root stretch of about 7 mm in 1000 remains and needs extra edge loops in the mesh), but no weak-point placement is approved. The existing converter (`rigging-src/tools/tripo_to_kit.py`) only handles biped skeletons | Blender deformation test and fixes, then a creature converter |
+| 3 | Dragon animations in the game | A walk, an idle, six idle variations and the four signature actions (breath, tail sweep, takeoff with hover, landing) exist in Blender and as glb files (see `RIG_NOTES.md`), and a Studio import test (2026-10-15) showed Roblox plays the baked Idle on the 74-bone skinned mesh through an AnimationController, so the dragon's own clips need no `MocapData` format; a first boss controller now runs in the test bed (`rigging-src/boss/`: hunts, breath wedge with a 1.9 s warning, tail sweep, weak points, stagger, death; not wired into `Main` yet), and the roar, hit flinch, weak-point stagger, 90-degree turn, charge run and death exist too (in Blender, `vyrath_moves2_v4.glb` and the Studio test bed, 19 clips); there is still no run start or stop, forward flight or dive | Boss controller code in `Main`, then upload the clips (Peter's OK) and key the rest |
+| 4 | Server hit detection for breath, tail, wings and weakpoints | Done in the test bed (breath wedge with a mouth sight ray, tail capsules, four weak-point sockets); the HeroWars melee and projectile code does not yet report its contact position to `Boss:hit` | Wire `Main`'s hit tests to the boss and tune the numbers |
+| 5 | 4-slot party with bot fill, allied bots, raid teams | Bots are duel-only; there is no raid team logic and no pathfinding recovery | Milestone 4, after the rig and animations |
+| 6 | Tests: solo, 1+3 bots, 2+2, 4 humans, desktop and mobile profile | Needs the rig, animations and party code first | Milestones 5 and 6 |
+| 7 | Boss HP and balance numbers (1,600 to 2,400 is provisional) | The bible's hero HP does not match the live game (Solarion 115, Wraithstep 100, Tempest 105, Bulwark 135); needs real damage tests | After the party code runs; set a target fight length first |
+| 8 | A four-hero default party | The bible's balanced party includes a healer, and no healer hero exists | Decide the lineup, or build a support hero |
+| 9 | PDF of the bible | The share page's PDF link does nothing when logged out. The Word file has the same content | Open the chat while signed in to ChatGPT, or export the Word file to PDF |
+| 10 | Illustrated six-frame storyboards for the other 30 characters, and finished 3D models | The bible only has written beats, plus one breath schematic for Vyrath | After Vyrath's boards are approved and become the quality standard |
+| 11 | Measurable acceptance gates (foot skating, mass, mobile performance) | They have no tolerances, scenarios or hardware targets | Write the numbers before milestone 3 |
+
+Always out: the chat's separate schematic image. It is not in this kit and must not be used as the design; Vyrath has to be an original creature.

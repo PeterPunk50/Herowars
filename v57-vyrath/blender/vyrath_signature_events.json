@@ -1,0 +1,261 @@
+{
+ "Sig_ThunderBreath": {
+  "markers": {
+   "plant": 14,
+   "cone_warning_start": 26,
+   "inhale_peak": 54,
+   "breath_start": 56,
+   "sweep_left_peak": 58,
+   "sweep_right_end": 98,
+   "exhale": 100,
+   "exposed_window_start": 108,
+   "exposed_window_end": 148,
+   "recovered": 169
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 55,
+    "state": "cancelable (charging)"
+   },
+   {
+    "from": 56,
+    "to": 99,
+    "state": "committed"
+   },
+   {
+    "from": 100,
+    "to": 148,
+    "state": "vulnerable (throat exposed)"
+   },
+   {
+    "from": 149,
+    "to": 169,
+    "state": "free"
+   }
+  ],
+  "warning_frames": [
+   26,
+   56
+  ],
+  "cone": {
+   "half_angle_deg": 12,
+   "range": 0.85,
+   "active_frames": [
+    56,
+    100
+   ]
+  }
+ },
+ "Sig_TailSweep": {
+  "markers": {
+   "flank_check": 18,
+   "coil": 36,
+   "plant": 44,
+   "contact_start": 50,
+   "contact_end": 60,
+   "recoil_peak": 78,
+   "recovered": 109
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 40,
+    "state": "cancelable (checking and coiling)"
+   },
+   {
+    "from": 41,
+    "to": 70,
+    "state": "committed"
+   },
+   {
+    "from": 71,
+    "to": 94,
+    "state": "vulnerable (recoil)"
+   },
+   {
+    "from": 95,
+    "to": 109,
+    "state": "free"
+   }
+  ],
+  "hit_frames": [
+   50,
+   60
+  ]
+ },
+ "Sig_Takeoff": {
+  "markers": {
+   "load_peak": 22,
+   "wings_unfolded": 34,
+   "front_paws_leave_ground": 32,
+   "hind_paws_leave_ground": 38,
+   "first_downstroke_end": 58,
+   "second_downstroke_start": 80,
+   "bank_peak": 96,
+   "level_in_hover": 109
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 30,
+    "state": "cancelable (loading)"
+   },
+   {
+    "from": 31,
+    "to": 109,
+    "state": "committed (airborne)"
+   }
+  ]
+ },
+ "Sig_Landing": {
+  "markers": {
+   "flare": 30,
+   "forefeet_contact": 62,
+   "hindfeet_contact": 70,
+   "compress_peak": 80,
+   "settled": 121
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 61,
+    "state": "committed (airborne)"
+   },
+   {
+    "from": 62,
+    "to": 96,
+    "state": "vulnerable (grounded, compressing)"
+   },
+   {
+    "from": 97,
+    "to": 121,
+    "state": "free"
+   }
+  ]
+ },
+ "Flight_Hover": {
+  "markers": {
+   "wings_top": 1,
+   "downstroke_end": 25
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 49,
+    "state": "airborne loop"
+   }
+  ]
+ },
+ "Roar": {
+  "markers": {
+   "inhale": 14,
+   "roar_start": 30,
+   "roar_end": 62,
+   "settled": 97
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 29,
+    "state": "cancelable"
+   },
+   {
+    "from": 30,
+    "to": 62,
+    "state": "committed (aggro roar, no hit)"
+   },
+   {
+    "from": 63,
+    "to": 97,
+    "state": "free"
+   }
+  ]
+ },
+ "Hit_Flinch": {
+  "markers": {
+   "impact": 3,
+   "peak": 10,
+   "recovered": 37
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 37,
+    "state": "hit reaction, plays over any cancelable window"
+   }
+  ]
+ },
+ "Stagger_WeakpointBreak": {
+  "markers": {
+   "hit": 1,
+   "buckle": 26,
+   "exposed_start": 26,
+   "exposed_end": 110,
+   "recovering": 128,
+   "recovered": 145
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 25,
+    "state": "committed (falling)"
+   },
+   {
+    "from": 26,
+    "to": 110,
+    "state": "vulnerable (stunned, head low)"
+   },
+   {
+    "from": 111,
+    "to": 145,
+    "state": "free"
+   }
+  ]
+ },
+ "Turn_Left90": {
+  "markers": {
+   "first_step": 4,
+   "last_step_down": 76,
+   "done": 85
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 85,
+    "state": "locomotion, cancelable"
+   }
+  ],
+  "note": "in place, body ends at +90 degrees yaw; mirror the yaw signs for a right turn"
+ },
+ "Charge_Run": {
+  "markers": {
+   "HL_down": 1,
+   "FL_down": 14
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 25,
+    "state": "locomotion loop"
+   }
+  ],
+  "note": "in place, ground speed 0.360 units per second (12.6 studs per second at the 25-stud scale)"
+ },
+ "Death": {
+  "markers": {
+   "hit": 1,
+   "rear": 14,
+   "collapse": 40,
+   "down": 70,
+   "still": 145
+  },
+  "interrupt_windows": [
+   {
+    "from": 1,
+    "to": 145,
+    "state": "terminal, holds the last frame"
+   }
+  ]
+ }
+}

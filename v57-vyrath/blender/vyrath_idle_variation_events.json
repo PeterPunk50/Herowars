@@ -1,0 +1,33 @@
+{
+ "Idle_LookAround": {
+  "turn_left_peak": 58,
+  "turn_right_peak": 122,
+  "back_to_centre": 176
+ },
+ "Idle_PawStomp": {
+  "paw_lift_start": 18,
+  "paw_top": 38,
+  "impact": 49
+ },
+ "Idle_PawShift": {
+  "weight_to_left": 30,
+  "hind_right_paw_up": 46,
+  "paw_down": 62
+ },
+ "Idle_WingStretch": {
+  "spreading": 20,
+  "full_spread": 62,
+  "folding_back": 122,
+  "rest": 170
+ },
+ "Idle_Snort": {
+  "inhale_start": 10,
+  "inhale_peak": 30,
+  "puff": 40,
+  "settled": 52
+ },
+ "Idle_TailSwish": {
+  "sweep_start": 18,
+  "sweep_end": 78
+ }
+}
