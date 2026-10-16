@@ -157,7 +157,7 @@ local heroRow=Instance.new("Frame"); heroRow.Name="CharacterChoice"; heroRow.Bac
 heroRow.Size=UDim2.fromOffset(260,40); heroRow.LayoutOrder=0; heroRow.Parent=panel
 -- v25: four heroes.
 local HERO_BUTTON_COLORS={Solarion=Color3.fromRGB(33,81,143),Wraithstep=Color3.fromRGB(93,55,134),
- Tempest=Color3.fromRGB(40,110,140),Bulwark=Color3.fromRGB(100,108,122),Valkyra=Color3.fromRGB(47,79,168)} -- V59: Valkyra
+ Tempest=Color3.fromRGB(40,110,140),Bulwark=Color3.fromRGB(100,108,122),Valkyra=Color3.fromRGB(47,79,168),DreadKnight=Color3.fromRGB(40,46,58)} -- V59: Valkyra, V60: Dread Knight
 -- R30 (Peter): the four hero buttons are gone; pick a hero in the Lobby (PLAY AS). This row now holds
 -- only the Lobby and Pause buttons.
 local debugOn=false; local flyUp=false; local flyDown=false; local flying=false
@@ -702,6 +702,10 @@ Sig.HERO={
  Valkyra={hit="sun",whiffFx="ember",step="breeze",landFx="gust",text=Color3.fromRGB(255,214,120),
   swingL={"swingFast",0.45,1.25},swingH={"swingHeavy",0.6,1.0},hitL={"punchLight",0.6,1.2},hitH={"clang",0.75,1.1},
   whiff={"fizz",0.3,1.5},dash={"wind",0.55,1.3},land={"land",0.55,1.1},block={"block",0.5,1.15}},
+ -- V60 Dread Knight: heavy great-sword sounds; cold white fire on every footstep and landing.
+ DreadKnight={hit="bronze",whiffFx="smoke",step="coldfire",landFx="coldfire",text=Color3.fromRGB(205,235,255),
+  swingL={"swingHeavy",0.55,0.9},swingH={"swingHeavy",0.8,0.65},hitL={"punchHeavy",0.7,0.9},hitH={"clang",0.85,0.7},
+  whiff={"grunt",0.5,0.7},dash={"stomp",0.6,0.9},land={"stomp",0.8,0.75},block={"clang",0.6,1.0}},
 }
 -- Per-move overrides: cast sound at release, hit sound, impact style, and the victim's reaction.
 Sig.MOVE={
@@ -724,6 +728,10 @@ Sig.MOVE={
  ValkyrieDive={cast={"dash",0.7,1.0},hitSnd={"explosion",0.7,1.3},hit="sunquake",react="body"},
  WingedRush={cast={"wind",0.75,1.3},hitSnd={"punchHeavy",0.8,1.1},hit="sun",react="stagger"},
  SkyToss={cast={"swingFast",0.5,1.1},react="launch"},
+ -- V60 Dread Knight
+ DeathGrip={cast={"chain",0.8,0.8},charge={"ghost",0.5,0.7},hitSnd={"chain",0.85,0.7},hit="chain",react="pull"},
+ SoulReaper={cast={"dash",0.7,0.7},hitSnd={"clang",0.9,0.6},hit="quake",react="body"},
+ BlightGround={cast={"ghost",0.8,0.6},charge={"charge",0.45,0.6}},
 }
 -- Victim reactions per hero for the basic attacks (moves above override these).
 Sig.REACT={
@@ -732,6 +740,7 @@ Sig.REACT={
  Tempest={Light1="shock",Light2="shock",Light3="launch",Heavy="shock"},
  Bulwark={Light1="jab",Light2="stagger",Light3="body",Heavy="stagger"},
  Valkyra={Light1="jab",Light2="stagger",Light3="launch",Heavy="body"}, -- V59
+ DreadKnight={Light1="stagger",Light2="stagger",Light3="body",Heavy="body"}, -- V60
 }
 -- Hurt poses by reaction (joint angles, same keys as KEYS). jitter = shakes while it holds (electric).
 Sig.HURTS={
@@ -958,6 +967,7 @@ function Sig.move(model,root,now)
    if me and (me.Position-g).Magnitude<25 then shake(0.5,0.2) end
   elseif H.landFx=="flare" then ring(g+Vector3.new(0,0.1,0),Color3.fromRGB(255,200,90),6,0.3); sigEmbers(g,Color3.fromRGB(255,170,60),10,6,4)
   elseif H.landFx=="smoke" then sigSmoke(g+Vector3.new(0,0.5,0),8)
+  elseif H.landFx=="coldfire" then Sig.coldPrint(g,2.4); sigEmbers(g+Vector3.new(0,0.2,0),Color3.fromRGB(215,240,255),14,5,6) -- V60
   else ring(g+Vector3.new(0,0.1,0),Color3.new(0.9,0.97,1),6,0.3) end
   Sig.sound(model,nil,"land",root)
  end
@@ -968,6 +978,11 @@ function Sig.move(model,root,now)
    burst(g+Vector3.new(0,0.2,0),Color3.fromRGB(185,175,155),1.6,0.3); Sig.play({"stomp",0.18,1.3},root)
   elseif H.step=="spark" then sigEmbers(g+Vector3.new(0,0.2,0),Color3.fromRGB(255,190,80),3,3,4)
   elseif H.step=="wisp" then sigSmoke(g+Vector3.new(0,0.3,0),2)
+  elseif H.step=="coldfire" then -- V60 Dread Knight: each footfall leaves a print of cold white fire under that foot
+   st.foot=st.foot=="LeftFoot" and "RightFoot" or "LeftFoot"
+   local f=model:FindFirstChild(st.foot)
+   if f then g=Vector3.new(f.Position.X,g.Y,f.Position.Z) end
+   Sig.coldPrint(g,1.1); sigEmbers(g+Vector3.new(0,0.15,0),Color3.fromRGB(215,240,255),4,2,5)
   elseif H.step=="breeze" then fadeOut(fxPart(Enum.PartType.Cylinder,Vector3.new(0.1,1,1),CFrame.new(g+Vector3.new(0,0.1,0))*CFrame.Angles(0,0,math.pi/2),Color3.new(0.9,0.97,1),0.5),0.3,{Size=Vector3.new(0.1,2.5,2.5)}) end
  end
 end
@@ -982,6 +997,7 @@ Sig.LIMB={
  Bulwark={Light1={"LeftHand"},Light2={"SwordBlade"},Light3={"RightFoot"},Heavy={"SwordBlade"},Slam={"SwordBlade","LeftHand"}},
  Valkyra={Light1={"RightHand"},Light2={"LeftHand"},Light3={"RightFoot"},Heavy={"RightHand"},JavelinOfLight={"RightHand"}, -- V59
   ValkyrieDive={"RightHand","LeftHand"},WingedRush={"LeftHand"},SkyToss={"RightHand","LeftHand"}},
+ DreadKnight={Light1={"Greatsword"},Light2={"Greatsword"},Light3={"Greatsword"},Heavy={"Greatsword"},SoulReaper={"Greatsword"}}, -- V60: the blade trails
 }
 function Sig.trailOn(part,accent)
  local tr=part:FindFirstChild("SigTrail")
@@ -1058,18 +1074,48 @@ Sig.MOCAP_FILE={SolarFlare="flare",ShadowDoor="door",DimensionDoor="door",Charge
 Sig.ALIAS={Solarion={Interrupt="Light2",Heavy="Beam"},Wraithstep={Interrupt="Light1",Super="Uppercut"},
  Tempest={Interrupt="Lightning",Super="Lightning"},Bulwark={Interrupt="Light1",Super="Slam"},
  -- V59: Valkyra's moves borrow the nearest generic pose keys; her captures are named after these (valkyra_lightning ...).
- Valkyra={JavelinOfLight="Lightning",ValkyrieDive="Pounce",WingedRush="Charge",SkyToss="Throw"}}
+ Valkyra={JavelinOfLight="Lightning",ValkyrieDive="Pounce",WingedRush="Charge",SkyToss="Throw"},
+ -- V60: Dread Knight's moves borrow generic pose keys too (captures dreadknight_grapple, _pounce, _slam).
+ DreadKnight={DeathGrip="Grapple",SoulReaper="Pounce",BlightGround="Slam",Interrupt="Light1"}}
 function Sig.alias(hero,name) local a=Sig.ALIAS[hero or ""]; return a and a[name] or name end
 Sig.MOCAP_REACT={jab="hit_head",claw="hit_head",shock="hit_shock",body="hit_body",burn="hit_body",pull="hit_body",
  stagger="hit_side",spin="hit_side",launch="hit_side"}
 Sig.mocapIds={}; Sig.mocapCache=setmetatable({},{__mode="k"}); Sig.mocapNow=setmetatable({},{__mode="k"})
 -- v50: a move with its own capture instead of the alias's (Bulwark's Shield Throw on the Interrupt slot).
-Sig.MOCAP_OVERRIDE={Bulwark={Interrupt="bulwark_shieldthrow"},Solarion={Heavy="solarion_heavy"}} -- V56: Solar Hammer plays its own (Blender) capture, not the Beam alias
+Sig.MOCAP_OVERRIDE={Bulwark={Interrupt="bulwark_shieldthrow"},Solarion={Heavy="solarion_heavy"},DreadKnight={Interrupt="dreadknight_gravestrike"}} -- V56: Solar Hammer plays its own (Blender) capture, not the Beam alias
 -- v50 captured ground loops per hero: Wraithstep stays crouched (idle) and runs low with his arms back (run);
 -- Solarion and Tempest have an idle. A hero without a run keeps the Roblox run.
 -- V52 gave the Bulwark slot Valkyra's shield idle and jog; V59 moves them to her own hero (valkyra_idle, valkyra_run) and
 -- Bulwark is back on his knight set (no captured loops, as in V51).
-Sig.LOOPS={Wraithstep={idle="idle",run="run"},Solarion={idle="idle"},Tempest={idle="idle"},Valkyra={idle="idle",run="run"}}
+-- V60 Dread Knight's cold white fire (looks only, every client). coldPrint: a fading footprint of white-blue flame on the
+-- ground; coldEyes: two small cold flames and a pale light burning in the eye slits of his helmet, made once per body.
+Sig.COLD=Color3.fromRGB(215,240,255)
+function Sig.coldPrint(at,size)
+ local disc=fxPart(Enum.PartType.Cylinder,Vector3.new(0.06,size,size),CFrame.new(at+Vector3.new(0,0.06,0))*CFrame.Angles(0,0,math.pi/2),Sig.COLD,0.25)
+ fadeOut(disc,1.6,{Size=Vector3.new(0.06,size*1.25,size*1.25)})
+ local core=fxPart(Enum.PartType.Cylinder,Vector3.new(0.07,size*0.45,size*0.45),CFrame.new(at+Vector3.new(0,0.07,0))*CFrame.Angles(0,0,math.pi/2),Color3.new(1,1,1),0.1)
+ fadeOut(core,0.9)
+ local a=Instance.new("Attachment"); a.Parent=disc
+ local e=Instance.new("ParticleEmitter"); e.Texture="rbxasset://textures/particles/fire_main.dds"; e.Color=ColorSequence.new(Color3.new(1,1,1),Sig.COLD)
+ e.LightEmission=1; e.Rate=0; e.Lifetime=NumberRange.new(0.35,0.7); e.Speed=NumberRange.new(0.5,1.5); e.SpreadAngle=Vector2.new(25,25)
+ e.Acceleration=Vector3.new(0,3,0); e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,size*0.35),NumberSequenceKeypoint.new(1,0)})
+ e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.2),NumberSequenceKeypoint.new(1,1)}); e.EmissionDirection=Enum.NormalId.Right; e.Parent=a
+ e:Emit(math.floor(6+size*4))
+end
+function Sig.coldEyes(model)
+ local head=model:FindFirstChild("Head"); if not head or head:FindFirstChild("ColdFireEyeL") then return end
+ local sx,sy,sz=head.Size.X,head.Size.Y,head.Size.Z
+ for _,side in {{"L",-1},{"R",1}} do
+  local a=Instance.new("Attachment"); a.Name="ColdFireEye"..side[1]; a.Position=Vector3.new(side[2]*sx*0.17,sy*0.08,-sz*0.46); a.Parent=head
+  local e=Instance.new("ParticleEmitter"); e.Name="ColdFire"; e.Texture="rbxasset://textures/particles/fire_main.dds"
+  e.Color=ColorSequence.new(Color3.new(1,1,1),Sig.COLD); e.LightEmission=1; e.LightInfluence=0; e.Rate=28
+  e.Lifetime=NumberRange.new(0.25,0.45); e.Speed=NumberRange.new(0.3,0.9); e.SpreadAngle=Vector2.new(12,12); e.Acceleration=Vector3.new(0,2.5,0)
+  e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,0.13),NumberSequenceKeypoint.new(1,0)})
+  e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.1),NumberSequenceKeypoint.new(1,1)}); e.EmissionDirection=Enum.NormalId.Top; e.Parent=a
+ end
+ local l=Instance.new("PointLight"); l.Name="ColdFireEyeLight"; l.Color=Sig.COLD; l.Brightness=1.6; l.Range=5; l.Parent=head
+end
+Sig.LOOPS={Wraithstep={idle="idle",run="run"},Solarion={idle="idle"},Tempest={idle="idle"},Valkyra={idle="idle",run="run"},DreadKnight={idle="idle",run="run"}}
 function Sig.mocapName(model,p,state)
  local hero=string.lower(Sig.heroOf(model))
  if p then
@@ -2833,7 +2879,7 @@ end)
 -- also a visual you can rotate and change the skin"). Opens on join and from the Lobby button. The preview
 -- body is built by the server (Preview) in the chosen skin and spun here in a viewport; drag to turn it.
 do
- local HEROES={"Solarion","Wraithstep","Tempest","Bulwark","Valkyra"} -- V59: Valkyra is her own hero
+ local HEROES={"Solarion","Wraithstep","Tempest","Bulwark","Valkyra","DreadKnight"} -- V59: Valkyra, V60: Dread Knight
  Sig.rigMove=function(m,f) -- V51: move a rig preview; a rig whose joints are connected moves as one piece, from its root
   local rr=m:FindFirstChild("HumanoidRootPart")
   if rr and #rr:GetConnectedParts(true)>0 then rr.CFrame=f(rr.CFrame)
@@ -2844,6 +2890,7 @@ do
   Wraithstep="Stealth assassin. No flight; pulls flyers down with his bats, vanishes, and hits harder from the shadows and inside his circle.",
   Tempest="Storm caster. A quick spark combo up close and long-reaching casts from the air; Gale pushes attackers away and Whirlwind locks one enemy down.",
   Bulwark="Armoured tank. Most health, no flight; breaks guards, charges or leaps at flyers, and parries with his shield.",
+  DreadKnight="Death knight. No flight; a heavy great-sword combo and a guard-breaking cleave, chains that drag enemies in, a leaping strike that drains life, and a ring of cold blight.",
   Valkyra="Winged shieldmaiden. Flies; a quick spear combo, a javelin of light at range, dives from above and dashes through foes on her wings.",
  }
  local DESC={
@@ -2869,6 +2916,13 @@ do
    Skill3="Winged Rush: a wing-boosted 16-stud dash through the enemy. You can't be hit for the first moment of it.",Dash="Quick dodge in the direction you're moving.",
    Flight="Take off or land on your wings. Space rises, X descends. Uses flight energy.",
    Defensive="Aegis Wings: your wings fold round your shield for 2 seconds and you take 60% less damage. Breaks stuns; 18 s cooldown."},
+  -- V60 Dread Knight
+  DreadKnight={Light="Three-hit great-sword combo: Reaper's Cut, Grave Slash, then Bone Breaker, which knocks back.",Heavy="Doom Cleave: a two-handed overhead cleave that breaks guard.",
+   Skill1="Death Grip: chains of cold fire drag the enemy you aim at to your feet from up to 40 studs and hold them a second. Pulls a flyer out of the air.",
+   Skill2="Soul Reaper: leap onto the enemy in front of you. The strike leaves a soul drain: 2 damage every half second for 3 seconds, and you heal what it drains.",
+   Skill3="Blight Ground: a ring of cold blight around you for 6 seconds. Enemies inside burn and take 25% more damage from you.",
+   Interrupt="Grave Strike: a fast pommel strike. Stops a cast and locks that power for 4 seconds.",Dash="Quick dodge in the direction you're moving.",
+   Defensive="Bone Armour: you take no damage until it has soaked 30, for 4 seconds. Breaks stuns; 18 s cooldown."},
  }
  local function stats(hero,id)
   local name=id=="Light" and "Light1" or (id=="Heavy" or id=="Skill1" or id=="Skill2" or id=="Skill3" or id=="Interrupt") and Rules.moveName(hero,id,1) or nil
@@ -3773,6 +3827,7 @@ local HERO_ANIMS={
  Tempest={idle=616136790,run=616140816,jump=616139451,fall=616134815},
  Bulwark={idle=657595757,run=657564596,jump=658409194,fall=657600338},
  Valkyra={idle=616136790,run=616140816,jump=616139451,fall=616134815}, -- V59: the Stylish set under her own captured idle and run
+ DreadKnight={idle=657595757,run=657564596,jump=658409194,fall=657600338}, -- V60: the Knight set under his own captured idle and run
 }
 local moveAnims={}
 local function heroTracks(model)
@@ -3873,6 +3928,7 @@ RunService.PreSimulation:Connect(function()
   local root=model:FindFirstChild("HumanoidRootPart")
   if root then updateStatusFx(model,root); updateStealth(model,root); if not hiddenFromMe(model) then Sig.move(model,root,now) end end
   if root and model:GetAttribute("Hero")=="Bulwark" then Sig.jugg(model,root) end
+  if root and model:GetAttribute("Hero")=="DreadKnight" then Sig.coldEyes(model) end -- V60
   if root then Sig.Motion.update(model,root,now) end
   local p=poses[model]; local J
   if p then
@@ -3885,7 +3941,7 @@ RunService.PreSimulation:Connect(function()
    J=evaluate(p,clock)
    if not J then poses[model]=nil end
   end
-  if not J and (model:GetAttribute("Hero")=="Bulwark" or model:GetAttribute("Hero")=="Valkyra") and (model:GetAttribute("Blocking") or model:GetAttribute("Shielded") or model:GetAttribute("Parrying")) then J=SHIELD_GUARD end
+  if not J and (model:GetAttribute("Hero")=="Bulwark" or model:GetAttribute("Hero")=="Valkyra" or model:GetAttribute("Hero")=="DreadKnight") and (model:GetAttribute("Blocking") or model:GetAttribute("Shielded") or model:GetAttribute("Parrying")) then J=SHIELD_GUARD end
   if not J and model:GetAttribute("Blocking") then J=GUARD end
   if not J and root and model:GetAttribute("Flying") then
    J=Sig.flyPose(model,root,now)

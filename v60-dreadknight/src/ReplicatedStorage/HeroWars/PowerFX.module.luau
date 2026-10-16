@@ -7,7 +7,7 @@ local Surface=require(script.Parent.SurfaceFX)
 local Rules=require(script.Parent.Rules)
 local FX={active=0,limit=UIS.TouchEnabled and 90 or 180}
 local folder=Instance.new("Folder"); folder.Name="HeroPowerFX"; folder.Parent=workspace
-local colors={Solarion=Color3.fromRGB(255,170,45),Wraithstep=Color3.fromRGB(145,83,217),Tempest=Color3.fromRGB(147,225,255),Bulwark=Color3.fromRGB(163,174,185),Valkyra=Color3.fromRGB(240,196,80)} -- V59: Valkyra gold
+local colors={Solarion=Color3.fromRGB(255,170,45),Wraithstep=Color3.fromRGB(145,83,217),Tempest=Color3.fromRGB(147,225,255),Bulwark=Color3.fromRGB(163,174,185),Valkyra=Color3.fromRGB(240,196,80),DreadKnight=Color3.fromRGB(205,235,255)} -- V59: Valkyra gold; V60: Dread Knight cold fire
 function FX.visible(model)
  local root=model and model:FindFirstChild("HumanoidRootPart")
  local camera=workspace.CurrentCamera
@@ -505,5 +505,66 @@ function FX.defensive(model)
   end
  end
  ring("AegisWingsGuard",root.Position,2.4,colors.Valkyra,0.5,CFrame.Angles(math.pi/2,0,0)); feathers(root.Position,12)
+end
+-- V60 (Peter, 2026-10-16: "cold white fire"): Dread Knight's effect kit, white-blue cold fire, wrapped the same way.
+local COLD_CORE=Color3.new(1,1,1)
+local function coldFlames(at,count,size) flames(at,colors.DreadKnight,count,size or 0.8,4); motes("ColdFireSparks",at,COLD_CORE,math.ceil(count/2),false) end
+local dkAttack,dkImpact,dkDefensive=FX.attack,FX.impact,FX.defensive
+function FX.attack(model,name,aim,move,delaySeconds,still)
+ if model:GetAttribute("Hero")~="DreadKnight" then return dkAttack(model,name,aim,move,delaySeconds,still) end
+ if not FX.visible(model) then return end
+ local col=colors.DreadKnight; local root=model:FindFirstChild("HumanoidRootPart"); if not root then return end
+ aim=(aim and aim.Magnitude>0.01) and aim.Unit or root.CFrame.LookVector
+ local function at(fn) task.delay(math.max(0,delaySeconds or 0),function() if model.Parent and (not still or still()) then fn() end end) end
+ local function blade() local b=model:FindFirstChild("Greatsword",true); return b and b.Position or root.Position+aim*2 end
+ local step=tonumber(string.match(name,"^Light(%d)$"))
+ if name=="DeathGrip" then
+  -- chains of cold fire lash out along the aim and snap back with whatever they caught
+  local hand=model:FindFirstChild("LeftHand") or root
+  at(function()
+   local a=hand.Position; local rp=RaycastParams.new(); rp.FilterType=Enum.RaycastFilterType.Exclude; rp.FilterDescendantsInstances={model}
+   local b=a+aim*(move.Range or 40); local hit=workspace:Raycast(a,b-a,rp); if hit then b=hit.Position end
+   for i=0,2 do task.delay(i*0.04,function() storm(a,b,col,0.35,0.09) end) end
+   line("DeathGripCore",a,b,0.08,COLD_CORE,0.3); coldFlames(b,10,0.9); flashLight(b,col,14,0.25); sound(ZAP,b,0.4,0.7)
+  end)
+ elseif name=="SoulReaper" then
+  coldFlames(root.Position,8,0.7); sound(WHOOSH,root.Position,0.6,0.7)
+  at(function()
+   task.wait(0.35)
+   local r=model:FindFirstChild("HumanoidRootPart"); if not r then return end
+   local g=r.Position-Vector3.new(0,2.8,0)
+   ring("SoulReaperImpact",g,move.Splash or 6,col,0.45); ring("SoulReaperCore",g,(move.Splash or 6)*0.5,COLD_CORE,0.3)
+   coldFlames(g+Vector3.new(0,0.5,0),18,1.1); shards(g,col,8,true); flashLight(g,col,20,0.3); sound(THUNDER,g,0.3,0.6)
+  end)
+ elseif name=="BlightGround" then
+  -- cold fire licks up round the rim of the blight ring while it forms
+  at(function()
+   local g=root.Position-Vector3.new(0,2.8,0); local rad=move.Radius or 9
+   for i=1,12 do local a=i/12*math.pi*2; coldFlames(g+Vector3.new(math.cos(a)*rad,0.3,math.sin(a)*rad),3,0.7) end
+   coldFlames(root.Position,10,0.9); flashLight(g,col,26,0.4); sound(FIRE,g,0.4,0.6)
+  end)
+ elseif step or name=="Heavy" or name=="Interrupt" then
+  -- the great sword trails cold fire through its swing; the cleave bursts where it lands
+  at(function()
+   local b=blade()
+   coldFlames(b,name=="Heavy" and 10 or 4,name=="Heavy" and 1 or 0.6)
+   if name=="Heavy" then local g=root.Position+aim*(move.Range or 9)*0.8-Vector3.new(0,2.6,0); ring("DoomCleaveRing",g,3,col,0.35); coldFlames(g,12,1); sound(FIRE,g,0.4,0.7) end
+  end)
+ end
+end
+function FX.impact(target,attacker,name,result)
+ if not (attacker and attacker:GetAttribute("Hero")=="DreadKnight") or result=="Dodge" or result=="Parry" or result=="Block" then return dkImpact(target,attacker,name,result) end
+ if not FX.visible(target) then return end
+ local root=target:FindFirstChild("HumanoidRootPart"); if not root then return end
+ local p=root.Position+Vector3.new(0,0.7,0)
+ coldFlames(p,8,0.8); shards(p,colors.DreadKnight,5,true); ring("ColdHitRing",p,1.4,COLD_CORE,0.2,CFrame.Angles(math.pi/2,0,0))
+end
+function FX.defensive(model)
+ if model:GetAttribute("Hero")~="DreadKnight" then return dkDefensive(model) end
+ if not FX.visible(model) then return end
+ -- Bone Armour: bone shards whirl round him in a ring of cold fire
+ local root=model:FindFirstChild("HumanoidRootPart"); if not root then return end
+ ring("BoneArmourRing",root.Position,2.2,colors.DreadKnight,0.5,CFrame.Angles(math.pi/2,0,0)); ring("BoneArmourRingHigh",root.Position+Vector3.new(0,1.6,0),1.8,COLD_CORE,0.45,CFrame.Angles(math.pi/2,0,0))
+ shards(root.Position,Color3.fromRGB(225,220,205),10,false); coldFlames(root.Position,12,0.9)
 end
 return FX

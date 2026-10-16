@@ -81,7 +81,7 @@ Rules.Bot = {
  Hard = {Think = {8, 16}, Block = 0.50, Evade = 0.15, Attack = 0.70, AntiAir = 0.50, Dash = 0.10, Trinket = 0.8, Ranged = 0.45},
  -- v27: the bot can be any hero (bot hero button). Trinket: chance to use its defensive to break a
  -- long stun or a knockdown. Ranged: chance per decision to use a long-range Skill 1 (Beam, Lightning).
- Heroes = {"Wraithstep", "Solarion", "Tempest", "Bulwark", "Valkyra"}, -- V59: Valkyra is her own hero
+ Heroes = {"Wraithstep", "Solarion", "Tempest", "Bulwark", "Valkyra", "DreadKnight"}, -- V59: Valkyra, V60: Dread Knight
 }
 -- Skins (v15): the HeroWars Skin & Animation Kit's looks. Cosmetic only.
 -- Palette = the kit's six colour zones (hex): Primary suit, Secondary lower arms/legs and gauntlets,
@@ -981,6 +981,52 @@ do
  local o = Rules.Skins.Bulwark.Order
  local i = table.find(o, "Paladin"); if i then table.remove(o, i) end
  table.insert(o, 1, "Paladin")
+end
+-- V60 (Peter, 2026-10-16: "next toon to do is the dread knight"; kit approved; "fire fx in his eyes, cold white footsteps,
+-- cold fire"): Dread Knight Varn, a sixth hero. A death knight with a cursed greatsword and cold white fire: heavy sword
+-- combo, a guard-breaking cleave, chains that drag foes in, a leaping strike that drains, a ring of blight, an interrupt
+-- and a bone shield. Every move reuses a mechanic the game already has; numbers are first guesses for the playtest.
+Rules.Display.DreadKnight = "Dread Knight"
+Rules.Characters.DreadKnight = {Health = 125, Speed = 14, DashSpeed = 38, Color = {0.078,0.086,0.102}, Accent = {0.749,0.902,1}}
+Rules.Defensives.DreadKnight = {Name = "Bone Armour", Kind = "Shield", Cooldown = 1080, Duration = 240, Absorb = 30}
+-- Skill 1: necrotic chains drag the target to his feet (the Grapple pull); knocks a flyer down.
+Rules.Moves.DeathGrip = {Startup = 20, Active = 4, Recovery = 24, Damage = 8, Stun = 60, Range = 40, Width = 6, Height = 8,
+ Cooldown = 480, Grounding = true, Pull = 3.5, HitStop = 6, Push = 0, Cost = 30}
+-- Skill 2: a leaping great-sword strike (Pounce = true) that leaves a soul drain: 2 damage every half second for 3 s, healing him.
+Rules.Moves.SoulReaper = {Startup = 16, Active = 30, Recovery = 20, Damage = 14, Stun = 26, Range = 5.5, Width = 5, Height = 6,
+ Cooldown = 360, HitStop = 10, Push = 0, Whiff = 18, Leap = 24, Splash = 6, Cost = 35, Pounce = true,
+ Drain = 2, DrainEvery = 30, DrainTicks = 6, DrainHeal = 1}
+-- Skill 3: a ring of cold blight round him for 6 s (the Shadow Circle zone): enemies inside burn and take 25% more from him.
+Rules.Moves.BlightGround = {Startup = 40, Active = 1, Recovery = 20, Damage = 0, Stun = 0, Range = 0, Width = 0, Height = 0,
+ Cooldown = 900, Cost = 25, Cast = true, ShadowCircle = true, Radius = 9, Duration = 360, Multiplier = 1.25, Burn = 2, BurnEvery = 30,
+ ZoneLabel = "BLIGHT GROUND", ZoneColor = "1B2A3A", ZoneEdge = "D8F0FF", ZoneText = "CFEAFF"}
+Rules.HeroSkills.DreadKnight = {Skill1 = "DeathGrip", Skill2 = "SoulReaper", Skill3 = "BlightGround"}
+Rules.HeroMoves.DreadKnight = {
+ Light1 = {Title = "Reaper's Cut", Damage = 7, Startup = 6, Range = 7},
+ Light2 = {Title = "Grave Slash", Damage = 8, Startup = 7, Range = 7},
+ Light3 = {Title = "Bone Breaker", Damage = 12, Startup = 9, Range = 7, Push = 6},
+ Heavy = {Title = "Doom Cleave", Damage = 18, Startup = 20, Range = 9, BreaksGuard = true},
+ Interrupt = {Title = "Grave Strike", Range = 8, Lunge = 2},
+}
+Rules.Titles.DeathGrip = "Death Grip"; Rules.Titles.SoulReaper = "Soul Reaper"; Rules.Titles.BlightGround = "Blight Ground"
+Rules.RemovedActions.DreadKnight = {Super = true, Flight = true}
+Rules.Cancels.DeathGrip = {On = "Hit", Into = {"Dash"}}
+Rules.Cancels.SoulReaper = {On = "Hit", Into = {"Dash"}}
+do
+ local melee = Rules.isMelee
+ function Rules.isMelee(name) return melee(name) or name == "SoulReaper" end
+end
+-- His skin leaves Bulwark's list: his own hero, black iron with cold white-blue fire, the greatsword welded into his rig
+-- (ReplicatedStorage.HeroWars.Rigs.VarnT), so no Aegis shield.
+do
+ local sk = Rules.Skins.Bulwark.DreadKnight
+ Rules.Skins.Bulwark.DreadKnight = nil
+ local o = Rules.Skins.Bulwark.Order; local i = table.find(o, "DreadKnight"); if i then table.remove(o, i) end
+ sk.Gear = nil; sk.Name = "Dread Knight"
+ sk.Palette.Accent = "BFE6FF"; sk.Palette.Emissive = "E6F6FF"
+ sk.Moves = {Heavy = {Glow = true}, BlightGround = {Glow = true}, SoulReaper = {Trail = true}}
+ sk.Suit = {Rules.hex(sk.Palette.Primary)}; sk.Accent = {Rules.hex(sk.Palette.Emissive)}
+ Rules.Skins.DreadKnight = {Order = {"DreadKnight"}, DreadKnight = sk}
 end
 table.clear(heroMoveCache)
 return Rules

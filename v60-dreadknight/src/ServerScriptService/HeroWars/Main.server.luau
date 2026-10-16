@@ -517,7 +517,7 @@ local function spawnFighter(player,hero,isDummy,skinId,ring)
  model.Parent=workspace
  Appearance.ownJoints(model); task.defer(Appearance.ownJoints,model) -- v50b: see Appearance.ownJoints
  Appearance.ensureShield(model,hero,skin) -- V49e: the catalog shield can miss the very first build (template yield); put it on if absent
- local SPAWN_X={Solarion=-10,Wraithstep=10,Tempest=-18,Bulwark=18,Valkyra=0} -- V59: Valkyra (x=0: the lanes at x=+-22..30 have Cover blocks 12 studs out)
+ local SPAWN_X={Solarion=-10,Wraithstep=10,Tempest=-18,Bulwark=18,Valkyra=0,DreadKnight=-34} -- V59: Valkyra (x=0: the lanes at x=+-22..30 have Cover blocks 12 studs out)
  local origin=isDummy and Vector3.new(0,4,spotZ("Dummy",-22)) or Vector3.new(SPAWN_X[hero] or 0,4,spotZ("Player",22))
  if practice then origin=D.practiceSpot(ring) end
  -- R65 (Peter: "sometimes the toon is below the ground"): stand the fighter on the real floor under its spot
@@ -928,7 +928,7 @@ local function applyHit(s,a,t,scale,stunOverride,splash,counter)
  if move.SweetSpot and (t.root.Position-s.root.Position).Magnitude>=move.Range-move.SweetSpot then damage*=1.25; sweet=true end
   if counter then damage*=Rules.CounterDamage end
  local zone=s.shadowCircle
- if s.hero=="Wraithstep" and zone and tick<zone.expires and zone.visual.Parent then
+ if zone and tick<zone.expires and zone.visual.Parent then -- V60: any hero with a zone move (Shadow Circle, Blight Ground)
   local delta=t.root.Position-zone.center
   if Vector3.new(delta.X,0,delta.Z).Magnitude<=zone.radius and math.abs(delta.Y)<=6 then damage*=zone.mult or 1.5 end
  end
@@ -1828,13 +1828,13 @@ local previewFolder=Instance.new("Folder"); previewFolder.Name="Previews"; previ
 -- R30: no 2-second head start for the fighters any more; skins build first. Building them also warms
 -- Appearance's gear and shield caches, so in-game skin changes are instant too. Total = how many looks.
 local previewQueue={}; local previewBase={}
-do local n=0; for _,h in {"Solarion","Wraithstep","Tempest","Bulwark","Valkyra"} do n+=#Rules.Skins[h].Order end; previewFolder:SetAttribute("Total",n) end
+do local n=0; for _,h in {"Solarion","Wraithstep","Tempest","Bulwark","Valkyra","DreadKnight"} do n+=#Rules.Skins[h].Order end; previewFolder:SetAttribute("Total",n) end
 local function previewFirst(hero,id)
  local q=previewQueue[hero]; if not q or previewFolder:FindFirstChild(hero.."|"..id) then return end
  local i=table.find(q,id); if i then table.remove(q,i) end
  table.insert(q,1,id)
 end
-for _,hero in {"Solarion","Wraithstep","Tempest","Bulwark","Valkyra"} do
+for _,hero in {"Solarion","Wraithstep","Tempest","Bulwark","Valkyra","DreadKnight"} do
  previewQueue[hero]=table.clone(Rules.Skins[hero].Order)
  task.spawn(function()
   local q=previewQueue[hero]
@@ -2660,23 +2660,24 @@ local function update(s)
      return p
     end
     local radius=a.move.Radius
-    local disc=piece("ShadowPool",Vector3.new(.08,radius*2,radius*2),CFrame.new(center)*CFrame.Angles(0,0,math.pi/2),Color3.fromRGB(34,12,57),.35)
+    local zc=function(hex,r,g,b) return hex and Color3.new(Rules.hex(hex)) or Color3.fromRGB(r,g,b) end -- V60: a zone move may carry its own colours
+    local disc=piece("ShadowPool",Vector3.new(.08,radius*2,radius*2),CFrame.new(center)*CFrame.Angles(0,0,math.pi/2),zc(a.move.ZoneColor,34,12,57),.35)
     disc.Shape=Enum.PartType.Cylinder
     for i=1,40 do
      local angle=i*math.pi*2/40
      local at=center+Vector3.new(math.cos(angle)*radius,.04,math.sin(angle)*radius)
-     piece("RuneEdge",Vector3.new(.18,.1,radius*2*math.pi/40*.85),CFrame.lookAt(at,center+Vector3.new(0,.04,0))*CFrame.Angles(0,math.pi/2,0),Color3.fromRGB(160,85,235),.1)
+     piece("RuneEdge",Vector3.new(.18,.1,radius*2*math.pi/40*.85),CFrame.lookAt(at,center+Vector3.new(0,.04,0))*CFrame.Angles(0,math.pi/2,0),zc(a.move.ZoneEdge,160,85,235),.1)
     end
     -- R17 (R16 audit 4): a floating label shows the bonus and the seconds left; the rim fades in the last 2 s.
     local tag=piece("CircleLabel",Vector3.one*.2,CFrame.new(center+Vector3.new(0,3.5,0)),Color3.new(),1)
     local bb=Instance.new("BillboardGui"); bb.Size=UDim2.fromOffset(190,40); bb.AlwaysOnTop=true; bb.MaxDistance=120; bb.Parent=tag
     local lbl=Instance.new("TextLabel"); lbl.Size=UDim2.fromScale(1,1); lbl.BackgroundTransparency=1; lbl.Font=Enum.Font.GothamBold
-    lbl.TextScaled=true; lbl.TextColor3=Color3.fromRGB(205,150,255); lbl.TextStrokeTransparency=.3; lbl.Parent=bb
+    lbl.TextScaled=true; lbl.TextColor3=zc(a.move.ZoneText,205,150,255); lbl.TextStrokeTransparency=.3; lbl.Parent=bb
     local seconds=math.floor(a.move.Duration/60+.5); local bonus=math.floor((a.move.Multiplier-1)*100+.5)
     task.spawn(function()
      for left=seconds,1,-1 do
       if not visual.Parent then return end
-      lbl.Text=string.format("SHADOW CIRCLE +%d%% • %ds",bonus,left)
+      lbl.Text=string.format("%s +%d%% • %ds",a.move.ZoneLabel or "SHADOW CIRCLE",bonus,left)
       if left<=2 then for _,p in visual:GetChildren() do if p.Name=="RuneEdge" then p.Transparency=left==2 and .4 or .7 end end end
       task.wait(1)
      end
@@ -2907,7 +2908,7 @@ task.spawn(function()
 end)
 -- R66-ui: a still practice dummy beside every duel ring except the first (the sparring bot stands there).
 task.delay(8,function()
- local heroes={"Bulwark","Tempest","Solarion","Wraithstep","Valkyra"}
+ local heroes={"Bulwark","Tempest","Solarion","Wraithstep","Valkyra","DreadKnight"}
  for i=2,#D.rings() do
   local ok,err=pcall(spawnFighter,nil,heroes[(i-2)%#heroes+1],"practice",nil,i); if not ok then warn("Practice dummy: "..tostring(err)) end
  end
