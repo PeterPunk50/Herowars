@@ -4058,9 +4058,20 @@ RunService.RenderStepped:Connect(function(dt)
     local torso=model:FindFirstChild("UpperTorso"); local arm=w.Part0
     if st.g<0.01 or not torso or not arm then w.C0=st.base*st.piece
     else
+     if Sig.heroOf(model)=="Valkyra" and root then
+      -- V59: her winged kite shield has a top and a front. In guard it stands upright in front of her chest with the
+      -- crest (mesh -X) facing where she faces, whatever the forearm and a crouching, leaning torso do; at rest it
+      -- keeps the fit measured on her shield idle (st.base, the ShieldWeld C0 from the build).
+      local look=Vector3.new(root.CFrame.LookVector.X,0,root.CFrame.LookVector.Z); look=look.Magnitude>0.01 and look.Unit or Vector3.new(0,0,-1)
+      local right=look:Cross(Vector3.yAxis)
+      local pos=torso.Position+look*(torso.Size.Z/2+0.9)-right*0.25+Vector3.new(0,0.05,0)
+      local upright=CFrame.lookAt(pos,pos+look)*CFrame.Angles(0,-math.pi/2,0)
+      w.C0=(st.base*st.piece):Lerp(arm.CFrame:ToObjectSpace(upright),st.g)
+     else
      local front=torso.CFrame*CFrame.new(-0.25,0.05,-(torso.Size.Z/2+0.9))*CFrame.Angles(0,-math.pi/2,0)
      -- v31: a catalog shield keeps its own turn (base.Rotation; identity for the kit shield).
      w.C0=st.base:Lerp(arm.CFrame:ToObjectSpace(front)*st.base.Rotation,st.g)*st.piece
+     end
     end
     continue
    end
