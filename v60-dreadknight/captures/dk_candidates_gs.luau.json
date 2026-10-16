@@ -1,0 +1,209 @@
+[
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 2.0,
+  "frames": 49,
+  "hit": 45,
+  "hit_time": 1.875,
+  "mirror": false,
+  "name": "cand_gs_idle"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 3.5333333015441895,
+  "frames": 86,
+  "hit": 31,
+  "hit_time": 1.2886274393867043,
+  "mirror": false,
+  "name": "cand_gs_idle_2"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 3.633333444595337,
+  "frames": 88,
+  "hit": 10,
+  "hit_time": 0.417624533861533,
+  "mirror": false,
+  "name": "cand_gs_idle_3"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 3.700000047683716,
+  "frames": 90,
+  "hit": 14,
+  "hit_time": 0.5820224794109216,
+  "mirror": false,
+  "name": "cand_gs_idle_4"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 7.599999904632568,
+  "frames": 183,
+  "hit": 151,
+  "hit_time": 6.305494426370977,
+  "mirror": false,
+  "name": "cand_gs_idle_5"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.399999976158142,
+  "frames": 35,
+  "hit": 8,
+  "hit_time": 0.32941175909603343,
+  "mirror": false,
+  "name": "cand_gs_walk"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.3333333730697632,
+  "frames": 33,
+  "hit": 26,
+  "hit_time": 1.0833333656191826,
+  "mirror": false,
+  "name": "cand_gs_walk_2"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 0.7666666507720947,
+  "frames": 19,
+  "hit": 10,
+  "hit_time": 0.4259259170956082,
+  "mirror": false,
+  "name": "cand_gs_run"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 0.6333333253860474,
+  "frames": 16,
+  "hit": 4,
+  "hit_time": 0.16888888676961264,
+  "mirror": false,
+  "name": "cand_gs_run_2"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.2999999523162842,
+  "frames": 32,
+  "hit": 15,
+  "hit_time": 0.6290322349917504,
+  "mirror": false,
+  "name": "cand_gs_slash"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 3.566666603088379,
+  "frames": 87,
+  "hit": 57,
+  "hit_time": 2.3639534462329954,
+  "mirror": false,
+  "name": "cand_gs_slash_2"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.8333333730697632,
+  "frames": 45,
+  "hit": 16,
+  "hit_time": 0.6666666811162775,
+  "mirror": false,
+  "name": "cand_gs_slash_3"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.8333333730697632,
+  "frames": 45,
+  "hit": 15,
+  "hit_time": 0.6250000135465101,
+  "mirror": false,
+  "name": "cand_gs_slash_4"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.4666666984558105,
+  "frames": 36,
+  "hit": 21,
+  "hit_time": 0.8800000190734864,
+  "mirror": false,
+  "name": "cand_gs_slash_5"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.899999976158142,
+  "frames": 47,
+  "hit": 27,
+  "hit_time": 1.1152173773102139,
+  "mirror": false,
+  "name": "cand_gs_high_spin_attack"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.5333333015441895,
+  "frames": 38,
+  "hit": 17,
+  "hit_time": 0.7045044898986816,
+  "mirror": false,
+  "name": "cand_gs_kick"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.7333333492279053,
+  "frames": 43,
+  "hit": 20,
+  "hit_time": 0.8253968329656691,
+  "mirror": false,
+  "name": "cand_gs_kick_2"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 0.5,
+  "frames": 13,
+  "hit": 10,
+  "hit_time": 0.4166666666666667,
+  "mirror": false,
+  "name": "cand_gs_blocking"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.0,
+  "frames": 25,
+  "hit": 17,
+  "hit_time": 0.7083333333333334,
+  "mirror": false,
+  "name": "cand_gs_blocking_2"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 0.5333333611488342,
+  "frames": 14,
+  "hit": 0,
+  "hit_time": 0.0,
+  "mirror": false,
+  "name": "cand_gs_blocking_3"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 4.833333492279053,
+  "frames": 117,
+  "hit": 54,
+  "hit_time": 2.250000073991973,
+  "mirror": false,
+  "name": "cand_gs_casting"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.2333333492279053,
+  "frames": 31,
+  "hit": 14,
+  "hit_time": 0.5755555629730225,
+  "mirror": false,
+  "name": "cand_gs_attack"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.1666666269302368,
+  "frames": 29,
+  "hit": 14,
+  "hit_time": 0.5833333134651184,
+  "mirror": false,
+  "name": "cand_spell_cast"
+ }
+]

@@ -1121,6 +1121,63 @@ function Sig.coldEyes(model)
  end
  local l=Instance.new("PointLight"); l.Name="ColdFireEyeLight"; l.Color=Sig.COLD; l.Brightness=1.6; l.Range=5; l.Parent=head
 end
+-- V60b (Peter: "hand grip sword grip wrong not in a fist", "his rig need to be two handed sword attacks"): his hands are
+-- Blender-curled fists welded over the hidden open claws (build_v60.py). Something that fades or shows his parts sets
+-- the hand's Transparency; the fist takes that value and the claw goes back to hidden.
+function Sig.fistHands(model)
+ for _,side in {"Right","Left"} do
+  local hand=model:FindFirstChild(side.."Hand"); local fist=model:FindFirstChild(side.."Fist")
+  if hand and fist and hand.Transparency<1 then fist.Transparency=hand.Transparency; hand.Transparency=1 end
+ end
+end
+function Sig.arc(u,v) -- the rotation turning unit vector u onto v
+ local c=u:Dot(v)
+ if c>0.99999 then return CFrame.identity end
+ if c<-0.99999 then local ax=u:Cross(Vector3.xAxis); if ax.Magnitude<1e-3 then ax=u:Cross(Vector3.yAxis) end; return CFrame.fromAxisAngle(ax.Unit,math.pi) end
+ return CFrame.fromAxisAngle(u:Cross(v).Unit,math.acos(c))
+end
+-- The Great Sword captures hold the hilt in both hands, but retargeted onto his longer arms the left hand drifts off it in
+-- the fast swings, so after each frame's pose the left arm is solved (two-bone IK, elbow kept on the captured side) to
+-- put the left fist on the sword at LeftGripY. Death Grip throws that hand out, so it is left alone there.
+Sig.armJoints=setmetatable({},{__mode="k"})
+function Sig.twoHand(model,motors,p)
+ if p and (p.name=="DeathGrip" or p.name=="Pin") then return end
+ local sword=model:FindFirstChild("Greatsword"); local gy=sword and sword:FindFirstChild("LeftGripY"); local gf=model:FindFirstChild("LeftGripFrame")
+ local sh,el,wr=motors.LeftShoulder,motors.LeftElbow,motors.LeftWrist
+ local weld=sword and sword:FindFirstChild("GreatswordWeld"); local root=model:FindFirstChild("HumanoidRootPart")
+ if not (gy and gf and sh and el and wr and weld and weld.Part0 and root and sh.Part0 and sh.Part1 and el.Part1) then return end
+ -- world frames from the root through the joints as posed this frame (part CFrames only follow Transform a step later)
+ local byPart=Sig.armJoints[model]
+ if not byPart then byPart={}; for _,m in motors do if m.Part1 then byPart[m.Part1]=m end end; Sig.armJoints[model]=byPart end
+ local cache={}
+ local function world(part)
+  if part==root then return root.CFrame end
+  if cache[part] then return cache[part] end
+  local m=byPart[part]; local c=(m and m.Part0) and world(m.Part0)*m.C0*m.Transform*m.C1:Inverse() or part.CFrame
+  cache[part]=c; return c
+ end
+ local H=world(weld.Part0)*weld.C0*weld.C1:Inverse()*CFrame.new(0,gy.Value,0)*gf.Value:Inverse() -- the left hand on the hilt
+ local UT=world(sh.Part0); local J0=UT*sh.C0; local S=J0.Position
+ local W=(H*wr.C1).Position
+ local a=(el.C0.Position-sh.C1.Position).Magnitude; local b=(wr.C0.Position-el.C1.Position).Magnitude
+ local d=W-S; local dist=d.Magnitude; if dist<1e-3 then return end
+ local dir=d/dist; local r=math.clamp(dist,math.abs(a-b)+0.02,a+b-0.02)
+ local UA=world(sh.Part1); local Ecur=(UA*el.C0).Position
+ local pole=(Ecur-S)-dir*(Ecur-S):Dot(dir)
+ if pole.Magnitude<1e-3 then pole=-UT.UpVector-dir*(-UT.UpVector):Dot(dir) end
+ pole=pole.Unit
+ local x=(a*a-b*b+r*r)/(2*r); local E=S+dir*x+pole*math.sqrt(math.max(a*a-x*x,0))
+ local UAr=Sig.arc(((UA*el.C0).Position-(UA*sh.C1).Position).Unit,(E-S).Unit)*UA.Rotation
+ local UAn=CFrame.new(S-UAr:VectorToWorldSpace(sh.C1.Position))*UAr
+ sh.Transform=J0:Inverse()*UAn*sh.C1
+ local J1=UAn*el.C0; local E1=J1.Position
+ local LA=J1*el.Transform*el.C1:Inverse()
+ local LAr=Sig.arc(((LA*wr.C0).Position-(LA*el.C1).Position).Unit,(S+dir*r-E1).Unit)*LA.Rotation
+ local LAn=CFrame.new(E1-LAr:VectorToWorldSpace(el.C1.Position))*LAr
+ el.Transform=J1:Inverse()*LAn*el.C1
+ local J2=LAn*wr.C0
+ wr.Transform=J2:Inverse()*CFrame.new(J2.Position-H.Rotation:VectorToWorldSpace(wr.C1.Position))*H.Rotation*wr.C1
+end
 Sig.LOOPS={Wraithstep={idle="idle",run="run"},Solarion={idle="idle"},Tempest={idle="idle"},Valkyra={idle="idle",run="run"},DreadKnight={idle="idle",run="run"}}
 function Sig.mocapName(model,p,state)
  local hero=string.lower(Sig.heroOf(model))
@@ -3934,7 +3991,7 @@ RunService.PreSimulation:Connect(function()
   local root=model:FindFirstChild("HumanoidRootPart")
   if root then updateStatusFx(model,root); updateStealth(model,root); if not hiddenFromMe(model) then Sig.move(model,root,now) end end
   if root and model:GetAttribute("Hero")=="Bulwark" then Sig.jugg(model,root) end
-  if root and model:GetAttribute("Hero")=="DreadKnight" then Sig.coldEyes(model) end -- V60
+  if root and model:GetAttribute("Hero")=="DreadKnight" then Sig.coldEyes(model); Sig.fistHands(model) end -- V60, V60b fists
   if root then Sig.Motion.update(model,root,now) end
   local p=poses[model]; local J
   if p then
@@ -3971,6 +4028,7 @@ RunService.PreSimulation:Connect(function()
    Sig.Motion.attack(model,motors,mp,now)
    posed[model]=true
    if set then playLoco(set,nil) end
+   Sig.twoHand(model,motors,p) -- V60b
    continue
   end
   if J then
@@ -4004,6 +4062,7 @@ RunService.PreSimulation:Connect(function()
     if set then playLoco(set,nil); for _,tr in set.tracks do if tr.IsPlaying then tr:Stop(0) end end end -- no fade: a blending Roblox run would fight the capture
     Sig.Motion.apply(model,motors,now,true) -- true: the capture owns the limbs (Motion.ground would lerp over it)
     if Sig.strafe then Sig.strafe(model,motors,speed>1.5 and root or nil,nil,now) end -- V55b: strafe turn on captured loops too
+    Sig.twoHand(model,motors,p) -- V60b
     continue
    end
    -- V49b: a capture stopped the Roblox clip earlier with set.current still naming it; clear it so playLoco restarts.
@@ -4017,6 +4076,7 @@ RunService.PreSimulation:Connect(function()
     else playLoco(set,"idle") end
     Sig.Motion.apply(model,motors,now,false)
     if Sig.strafe then Sig.strafe(model,motors,speed>1.5 and root or nil,set,now) end -- V55b: after Motion.ground, which rewrote Root/Waist every frame and hid the strafe turn
+    Sig.twoHand(model,motors,p) -- V60b
     continue
    end
    local swing=math.sin(now*10)*math.min(speed/20,1)*0.5
@@ -4027,6 +4087,7 @@ RunService.PreSimulation:Connect(function()
   end
   Sig.Motion.apply(model,motors,now,p~=nil or model:GetAttribute("Blocking"))
   Sig.Motion.attack(model,motors,p,now)
+  Sig.twoHand(model,motors,p) -- V60b
  end
 end)
 -- v26 hair, capes and shield (looks only, run on every client). Pieces the server hung on a Weld swing

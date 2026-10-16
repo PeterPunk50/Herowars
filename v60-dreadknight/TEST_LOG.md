@@ -12,3 +12,37 @@
 Not done: the greatsword is generated (Tripo, `~/Downloads/HeroWars_dreadknight/DreadKnight_Greatsword.glb`) but not imported:
 Studio's Import 3D needs the screen and the Mac went to its lock screen. Cold-fire eyes and footprints are in the client
 but have not been seen on screen (display capture needs the unlocked screen).
+
+## V60b: fists, two-handed attacks, bigger sword (2026-10-16 evening)
+
+Peter: "hand grip sword grip wrong not in a fist", "his rig need to be two handed sword attacks and sword needs to be a
+little bigger".
+
+- **Two-handed moves.** The Mixamo Great Sword Pack (51 clips, downloaded through Peter's Chrome sign-in) went through
+  `tools/fbx_to_glb_batch_blender.py`, and `build_dreadknight_captures.py` now takes every move from it:
+  - Idle: `gs_idle`.
+  - Run: `gs_run_2`, the forward run (`gs_run` is the backward one, found by hip travel).
+  - Reaper's Cut, Grave Slash and Bone Breaker: the three swings of the combo slash `gs_slash_2`, hits at 0.47, 1.6 and 3.0 s.
+  - Doom Cleave: the downward slash `gs_slash_3`.
+  - Death Grip: `spell_cast`.
+  - Grave Strike: the hilt strike `gs_attack`.
+  - Guard: `gs_blocking_2`.
+  - Soul Reaper and Blight Ground: unchanged.
+
+  Contact sheets were rendered to choose. MocapData was updated.
+- **Fists.** `tools/fist/make_fists.py` (Blender, headless) curls both hands' claws around the grip line and exports
+  `varn_fists.fbx`.
+  - The grip line is measured by `tools/fist/grip_axis.py`: the line through both palms in the two-handed idle, right hand
+    (-0.29,-0.48,0.82). The left fist uses the mirror, because the retarget twists that wrist.
+  - Imported into `DreadKnight_sword_import.rbxlx` as RightFist, LeftFist, RightHandRef and LeftHandRef (uploaded,
+    approved).
+  - The reference hands came in at exactly his hand sizes, unrotated, so `captures/fists.json` offsets apply 1:1.
+- **Build.** `build_v60.py` welds the fists to his hands and hides the open claws (Transparency 1; the client copies any
+  fade to the fist).
+  - The sword is 1.3× (5.46 studs) and sits in the right fist just under the guard.
+  - LeftGripFrame and LeftGripY tell the client where the left fist holds the sword.
+- **Client.** `Sig.twoHand`: after each frame's pose, a two-bone IK puts the left fist on the hilt (elbow kept on the
+  captured side), except during Death Grip.
+  - The retargeted palms drift up to about 30 cm apart in fast swings; in the idle they are 16 cm apart.
+- **Not yet checked in Play.** All Studios closed at 17:26 before the rebuilt V60_pre finished loading. The full
+  V60_DreadKnight place has not been rebuilt with V60b yet.
