@@ -41,3 +41,14 @@ Trap: Import Preview's checkboxes lag; the importer showed "AssetImporter is not
 ### Not tested in this run
 
 Breath through a wall (no blocks between boss and spawn in this run), flight clips (the brain never picks them), mobile, a live published server.
+
+## Run 1b, 2026-10-16: game place V58 (V56 + the fresh test bed)
+
+Built with `tools/build_game_place.py` (copy of `build_v57_vyrath.py`, HUD label argument) in 15 s. Edit check through the MCP: `ServerStorage.VyrathBoss` holds the model (83 bones, mesh `77072494862863`) and 19 clips; `HeroWars.VyrathBoss` has Boss, BossData, BossLink; all 4 Main patches present; VyrathHud present.
+
+| Test (Play, scripted through the Combat remote) | Result |
+|---|---|
+| 5a: Select Solarion, `Boss toggle` | dragon summoned, VyrathHud shown |
+| 5b: watch 36 s | Charge_Run, Walk, Thunder Breath, Roar, Idle; closest approach 15.2 studs; Solarion 115 to 61 (two breaths of 27) |
+| 5c/5d: 49 Light attacks while facing the dragon | dragon HP 2000 to 1780 |
+| Console | no errors; only Studio's DataStore notices and Roblox's own UIBlox warnings |
