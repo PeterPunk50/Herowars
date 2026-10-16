@@ -1,0 +1,11 @@
+StarterPlayer.StarterPlayerScripts.HeroWarsClient	LocalScript	StarterPlayer/StarterPlayerScripts/HeroWarsClient.client.luau
+ReplicatedStorage.HeroWars.MocapData	ModuleScript	ReplicatedStorage/HeroWars/MocapData.module.luau
+ReplicatedStorage.HeroWars.Rules	ModuleScript	ReplicatedStorage/HeroWars/Rules.module.luau
+ReplicatedStorage.HeroWars.ModernStyle	ModuleScript	ReplicatedStorage/HeroWars/ModernStyle.module.luau
+ReplicatedStorage.HeroWars.PowerFX	ModuleScript	ReplicatedStorage/HeroWars/PowerFX.module.luau
+ReplicatedStorage.HeroWars.SurfaceFX	ModuleScript	ReplicatedStorage/HeroWars/SurfaceFX.module.luau
+ReplicatedStorage.HeroWars.MotionData	ModuleScript	ReplicatedStorage/HeroWars/MotionData.module.luau
+ReplicatedStorage.HeroWars.FlightMotion	ModuleScript	ReplicatedStorage/HeroWars/FlightMotion.module.luau
+ReplicatedStorage.HeroWars.MeshCostumes	ModuleScript	ReplicatedStorage/HeroWars/MeshCostumes.module.luau
+ServerScriptService.HeroWars.Appearance	ModuleScript	ServerScriptService/HeroWars/Appearance.module.luau
+ServerScriptService.HeroWars.Main	Script	ServerScriptService/HeroWars/Main.server.luau
