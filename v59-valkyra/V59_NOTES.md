@@ -28,3 +28,12 @@ Vyrath boss as in V58. Place files: `~/Downloads/HeroWars_valkyra/` (not in git:
 - Sky Toss is defined but no hero has a throw button in this version (throws left the action bar earlier), so it is
   unused. It could go on her free Interrupt key (8).
 - Numbers are first guesses; no PvP test against another player.
+
+## Shield status (end of 2026-10-16 session)
+
+The Tripo winged shield is imported (mesh `rbxassetid://139531211590273`, colour/normal/metal-rough maps uploaded) and is on
+Valkyra's rig in V59 (`ShieldDisc` on `ShieldWeld`, 1.9 studs tall). Its fit is not finished: with C0 square to the forearm,
+her shield idle turns it 90 degrees (wings up and down), and the guard turn tips the crest toward the floor. The idle-pose
+C0 that stands it upright was measured (`tools/measure_idle_arm_client.luau`):
+`-0.4249 0.0166 -0.0669 0.98293 0.04404 -0.17861 0.16737 0.18874 0.96766 0.07633 -0.98104 0.17814`; the guard code also needs
+to keep a shaped shield upright (use the root's rotation, not base.Rotation). Peter said stop before this was applied.
