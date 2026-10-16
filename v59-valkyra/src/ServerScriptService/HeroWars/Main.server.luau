@@ -517,7 +517,7 @@ local function spawnFighter(player,hero,isDummy,skinId,ring)
  model.Parent=workspace
  Appearance.ownJoints(model); task.defer(Appearance.ownJoints,model) -- v50b: see Appearance.ownJoints
  Appearance.ensureShield(model,hero,skin) -- V49e: the catalog shield can miss the very first build (template yield); put it on if absent
- local SPAWN_X={Solarion=-10,Wraithstep=10,Tempest=-18,Bulwark=18,Valkyra=-26} -- V59: Valkyra
+ local SPAWN_X={Solarion=-10,Wraithstep=10,Tempest=-18,Bulwark=18,Valkyra=0} -- V59: Valkyra (x=0: the lanes at x=+-22..30 have Cover blocks 12 studs out)
  local origin=isDummy and Vector3.new(0,4,spotZ("Dummy",-22)) or Vector3.new(SPAWN_X[hero] or 0,4,spotZ("Player",22))
  if practice then origin=D.practiceSpot(ring) end
  -- R65 (Peter: "sometimes the toon is below the ground"): stand the fighter on the real floor under its spot
