@@ -1,0 +1,101 @@
+[
+ {
+  "clip": "Sword_Idle",
+  "duration": 1.6666666269302368,
+  "frames": 41,
+  "hit": 19,
+  "hit_time": 0.7916666477918625,
+  "mirror": false,
+  "name": "dreadknight_idle"
+ },
+ {
+  "clip": "Walk_Loop",
+  "duration": 0.6666666865348816,
+  "frames": 33,
+  "hit": 2,
+  "hit_time": 0.0416666679084301,
+  "mirror": false,
+  "name": "dreadknight_run"
+ },
+ {
+  "clip": "Sword_Attack",
+  "duration": 0.8,
+  "frames": 20,
+  "hit": 8,
+  "hit_time": 0.33684210526315794,
+  "mirror": false,
+  "name": "dreadknight_light1"
+ },
+ {
+  "clip": "Sword_Heavy_Combo",
+  "duration": 1.2,
+  "frames": 30,
+  "hit": 12,
+  "hit_time": 0.49655172413793097,
+  "mirror": false,
+  "name": "dreadknight_light2"
+ },
+ {
+  "clip": "Sword_Heavy_Combo",
+  "duration": 0.9999999999999998,
+  "frames": 25,
+  "hit": 12,
+  "hit_time": 0.4999999999999998,
+  "mirror": false,
+  "name": "dreadknight_light3"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.8333333730697632,
+  "frames": 45,
+  "hit": 15,
+  "hit_time": 0.6250000135465101,
+  "mirror": false,
+  "name": "dreadknight_heavy"
+ },
+ {
+  "clip": "Spell_Simple_Shoot",
+  "duration": 0.5,
+  "frames": 13,
+  "hit": 6,
+  "hit_time": 0.25,
+  "mirror": false,
+  "name": "dreadknight_grapple"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 2.200000047683716,
+  "frames": 54,
+  "hit": 27,
+  "hit_time": 1.1207547412728363,
+  "mirror": false,
+  "name": "dreadknight_pounce"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 3.5333333015441895,
+  "frames": 86,
+  "hit": 68,
+  "hit_time": 2.8266666412353514,
+  "mirror": false,
+  "name": "dreadknight_slam"
+ },
+ {
+  "clip": "Punch_Jab",
+  "duration": 0.8666666746139526,
+  "frames": 22,
+  "hit": 5,
+  "hit_time": 0.20634920824141728,
+  "mirror": false,
+  "name": "dreadknight_gravestrike"
+ },
+ {
+  "clip": "Sword_Block",
+  "duration": 1.9933333333333334,
+  "frames": 24,
+  "hit": -1,
+  "hit_time": null,
+  "mirror": false,
+  "name": "dreadknight_guard"
+ }
+]

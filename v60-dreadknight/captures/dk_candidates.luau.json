@@ -1,0 +1,92 @@
+[
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 1.8333333730697632,
+  "frames": 45,
+  "hit": 15,
+  "hit_time": 0.6250000135465101,
+  "mirror": false,
+  "name": "cand_gs_slash"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 2.200000047683716,
+  "frames": 54,
+  "hit": 27,
+  "hit_time": 1.1207547412728363,
+  "mirror": false,
+  "name": "cand_gs_jump"
+ },
+ {
+  "clip": "Armature|mixamo.com|Layer0",
+  "duration": 3.5333333015441895,
+  "frames": 86,
+  "hit": 68,
+  "hit_time": 2.8266666412353514,
+  "mirror": false,
+  "name": "cand_gs_power"
+ },
+ {
+  "clip": "Sword_Idle",
+  "duration": 1.6666666269302368,
+  "frames": 41,
+  "hit": 19,
+  "hit_time": 0.7916666477918625,
+  "mirror": false,
+  "name": "cand_sword_idle"
+ },
+ {
+  "clip": "Sword_Attack",
+  "duration": 1.5333333015441895,
+  "frames": 38,
+  "hit": 10,
+  "hit_time": 0.4144144058227539,
+  "mirror": false,
+  "name": "cand_sword_attack"
+ },
+ {
+  "clip": "Sword_Heavy_Combo",
+  "duration": 4.333333492279053,
+  "frames": 105,
+  "hit": 43,
+  "hit_time": 1.7916667323846083,
+  "mirror": false,
+  "name": "cand_heavy_combo"
+ },
+ {
+  "clip": "Spell_Simple_Shoot",
+  "duration": 0.5,
+  "frames": 13,
+  "hit": 0,
+  "hit_time": 0.0,
+  "mirror": false,
+  "name": "cand_spell_shoot"
+ },
+ {
+  "clip": "Punch_Jab",
+  "duration": 0.8666666746139526,
+  "frames": 22,
+  "hit": 5,
+  "hit_time": 0.20634920824141728,
+  "mirror": false,
+  "name": "cand_punch_jab"
+ },
+ {
+  "clip": "Walk_Formal_Loop",
+  "duration": 1.3333333730697632,
+  "frames": 33,
+  "hit": 3,
+  "hit_time": 0.1250000037252903,
+  "mirror": false,
+  "name": "cand_walk_formal"
+ },
+ {
+  "clip": "Sword_Block",
+  "duration": 1.2333333492279053,
+  "frames": 31,
+  "hit": 4,
+  "hit_time": 0.1644444465637207,
+  "mirror": false,
+  "name": "cand_sword_block"
+ }
+]
