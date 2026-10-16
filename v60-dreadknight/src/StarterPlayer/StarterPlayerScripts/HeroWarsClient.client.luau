@@ -1091,27 +1091,33 @@ Sig.MOCAP_OVERRIDE={Bulwark={Interrupt="bulwark_shieldthrow"},Solarion={Heavy="s
 -- ground; coldEyes: two small cold flames and a pale light burning in the eye slits of his helmet, made once per body.
 Sig.COLD=Color3.fromRGB(215,240,255)
 function Sig.coldPrint(at,size)
- local disc=fxPart(Enum.PartType.Cylinder,Vector3.new(0.06,size,size),CFrame.new(at+Vector3.new(0,0.06,0))*CFrame.Angles(0,0,math.pi/2),Sig.COLD,0.25)
- fadeOut(disc,1.6,{Size=Vector3.new(0.06,size*1.25,size*1.25)})
- local core=fxPart(Enum.PartType.Cylinder,Vector3.new(0.07,size*0.45,size*0.45),CFrame.new(at+Vector3.new(0,0.07,0))*CFrame.Angles(0,0,math.pi/2),Color3.new(1,1,1),0.1)
+ -- a translucent ice-blue glow on the ground with a white-hot centre and cold wisps rising off it; fades in 1.6 s
+ local glow=fxPart(Enum.PartType.Cylinder,Vector3.new(0.05,size,size),CFrame.new(at+Vector3.new(0,0.05,0))*CFrame.Angles(0,0,math.pi/2),Color3.fromRGB(150,210,255),0.55)
+ fadeOut(glow,1.6,{Size=Vector3.new(0.05,size*1.3,size*1.3)})
+ local core=fxPart(Enum.PartType.Cylinder,Vector3.new(0.06,size*0.4,size*0.4),CFrame.new(at+Vector3.new(0,0.06,0))*CFrame.Angles(0,0,math.pi/2),Color3.new(1,1,1),0.3)
  fadeOut(core,0.9)
- local a=Instance.new("Attachment"); a.Parent=disc
- local e=Instance.new("ParticleEmitter"); e.Texture="rbxasset://textures/particles/fire_main.dds"; e.Color=ColorSequence.new(Color3.new(1,1,1),Sig.COLD)
- e.LightEmission=1; e.Rate=0; e.Lifetime=NumberRange.new(0.35,0.7); e.Speed=NumberRange.new(0.5,1.5); e.SpreadAngle=Vector2.new(25,25)
- e.Acceleration=Vector3.new(0,3,0); e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,size*0.35),NumberSequenceKeypoint.new(1,0)})
- e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.2),NumberSequenceKeypoint.new(1,1)}); e.EmissionDirection=Enum.NormalId.Right; e.Parent=a
- e:Emit(math.floor(6+size*4))
+ local a=Instance.new("Attachment"); a.Parent=glow
+ local e=Instance.new("ParticleEmitter"); e.Texture="rbxasset://textures/particles/smoke_main.dds"; e.Color=ColorSequence.new(Color3.new(1,1,1),Color3.fromRGB(120,190,255))
+ e.LightEmission=0.8; e.LightInfluence=0; e.Rate=0; e.Lifetime=NumberRange.new(0.5,0.9); e.Speed=NumberRange.new(1,2.2); e.SpreadAngle=Vector2.new(20,20)
+ e.Acceleration=Vector3.new(0,2,0); e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,size*0.32),NumberSequenceKeypoint.new(1,size*0.05)})
+ e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.35),NumberSequenceKeypoint.new(1,1)}); e.EmissionDirection=Enum.NormalId.Right; e.Parent=a
+ e:Emit(math.floor(8+size*6))
 end
 function Sig.coldEyes(model)
  local head=model:FindFirstChild("Head"); if not head or head:FindFirstChild("ColdFireEyeL") then return end
  local sx,sy,sz=head.Size.X,head.Size.Y,head.Size.Z
  for _,side in {{"L",-1},{"R",1}} do
-  local a=Instance.new("Attachment"); a.Name="ColdFireEye"..side[1]; a.Position=Vector3.new(side[2]*sx*0.17,sy*0.08,-sz*0.46); a.Parent=head
-  local e=Instance.new("ParticleEmitter"); e.Name="ColdFire"; e.Texture="rbxasset://textures/particles/fire_main.dds"
-  e.Color=ColorSequence.new(Color3.new(1,1,1),Sig.COLD); e.LightEmission=1; e.LightInfluence=0; e.Rate=28
-  e.Lifetime=NumberRange.new(0.25,0.45); e.Speed=NumberRange.new(0.3,0.9); e.SpreadAngle=Vector2.new(12,12); e.Acceleration=Vector3.new(0,2.5,0)
-  e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,0.13),NumberSequenceKeypoint.new(1,0)})
-  e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.1),NumberSequenceKeypoint.new(1,1)}); e.EmissionDirection=Enum.NormalId.Top; e.Parent=a
+  -- the eye slits: his head part includes the horns, so they sit below its centre
+  local a=Instance.new("Attachment"); a.Name="ColdFireEye"..side[1]; a.Position=Vector3.new(side[2]*sx*0.095,-sy*0.125,-sz*0.52); a.Parent=head
+  -- smoke_main is grayscale and takes the tint; the fire texture is orange and reads warm
+  local e=Instance.new("ParticleEmitter"); e.Name="ColdFire"; e.Texture="rbxasset://textures/particles/smoke_main.dds"
+  e.Color=ColorSequence.new(Color3.new(1,1,1),Color3.fromRGB(120,190,255)); e.LightEmission=1; e.LightInfluence=0; e.Brightness=3; e.Rate=40 -- Brightness: reads in daylight over the helmet's green glow
+  e.Lifetime=NumberRange.new(0.3,0.5); e.Speed=NumberRange.new(0.5,1.1); e.SpreadAngle=Vector2.new(8,8); e.Acceleration=Vector3.new(0,2.5,0)
+  e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,0.16),NumberSequenceKeypoint.new(1,0.02)})
+  local core=Instance.new("ParticleEmitter"); core.Name="ColdFireCore"; core.Texture="rbxasset://textures/particles/sparkles_main.dds"
+  core.Color=ColorSequence.new(Color3.new(1,1,1)); core.LightEmission=1; core.LightInfluence=0; core.Brightness=5; core.Rate=24; core.Lifetime=NumberRange.new(0.15,0.25)
+  core.Speed=NumberRange.new(0,0.1); core.Size=NumberSequence.new(0.09); core.Parent=a
+  e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.15),NumberSequenceKeypoint.new(1,1)}); e.EmissionDirection=Enum.NormalId.Top; e.Parent=a
  end
  local l=Instance.new("PointLight"); l.Name="ColdFireEyeLight"; l.Color=Sig.COLD; l.Brightness=1.6; l.Range=5; l.Parent=head
 end

@@ -42,7 +42,17 @@ for k, v in (('Anchored', 'false'), ('CanCollide', 'false'), ('CanTouch', 'false
     if k in p: p[k].text = v
     else: e = ET.SubElement(new.find('Properties'), 'bool', {'name': k}); e.text = v
 new.set('referent', 'RBXGreatswordV60')
-weld = ET.SubElement(new, 'Item', {'class': 'Weld', 'referent': 'RBXGreatswordWeldV60'}); wp = ET.SubElement(weld, 'Properties')
+# His Humanoid auto-scales (Body*Scale 0.034, from the cm FBX); a part with no OriginalSize gets shrunk by that factor
+# when the character enters the workspace, so the sword carries OriginalSize = Size / scale like his body parts do.
+hum = next(i for i in rig.findall('Item') if i.get('class') == 'Humanoid')
+scale = {name(v): float(props(v)['Value'].text) for v in hum.findall('Item') if v.get('class') == 'NumberValue'}
+size = props(new)['size']
+osz = ET.SubElement(new, 'Item', {'class': 'Vector3Value', 'referent': 'RBXGreatswordOrigSizeV60'}); op = ET.SubElement(osz, 'Properties')
+ET.SubElement(op, 'string', {'name': 'Name'}).text = 'OriginalSize'
+ov = ET.SubElement(op, 'Vector3', {'name': 'Value'})
+for k, s in (('X', 'BodyWidthScale'), ('Y', 'BodyHeightScale'), ('Z', 'BodyDepthScale')):
+    ET.SubElement(ov, k).text = repr(float(size.find(k).text) / (scale.get(s) or 1))
+weld =ET.SubElement(new, 'Item', {'class': 'Weld', 'referent': 'RBXGreatswordWeldV60'}); wp = ET.SubElement(weld, 'Properties')
 ET.SubElement(wp, 'string', {'name': 'Name'}).text = 'GreatswordWeld'
 ET.SubElement(wp, 'Ref', {'name': 'Part0'}).text = hand.get('referent')
 ET.SubElement(wp, 'Ref', {'name': 'Part1'}).text = 'RBXGreatswordV60'
