@@ -44,5 +44,13 @@ little bigger".
 - **Client.** `Sig.twoHand`: after each frame's pose, a two-bone IK puts the left fist on the hilt (elbow kept on the
   captured side), except during Death Grip.
   - The retargeted palms drift up to about 30 cm apart in fast swings; in the idle they are 16 cm apart.
-- **Not yet checked in Play.** All Studios closed at 17:26 before the rebuilt V60_pre finished loading. The full
-  V60_DreadKnight place has not been rebuilt with V60b yet.
+- **Play check (V60_pre, 2026-10-16 17:40-18:00).**
+  - Sword 5.46 studs; both fists full size; open claws hidden (Transparency 1).
+  - The left fist's grip point lands on the hilt at LeftGripY to within 0.00001 studs.
+  - First pass: over 1,501 frames of combo and Doom Cleave, the left fist left the hilt in 10% of frames, every one because
+    the hilt was beyond the left arm's reach (up to 1.45× arm length).
+  - Fix: `Sig.twoHand` now pulls the sword and right arm in toward the left shoulder by the shortfall (`Sig.solveArm` for
+    both arms). Rerun: 0 of 1,437 frames off the hilt.
+  - Every move plays its new capture: Light 1.00 s, Doom Cleave 1.83 s, Death Grip 1.17 s, Soul Reaper 2.20 s,
+    Blight Ground 3.53 s, Grave Strike 1.23 s, block 1.00 s.
+  - Console clean. Screenshots: `~/Downloads/HeroWars_dreadknight/V60b_*.jpg`.

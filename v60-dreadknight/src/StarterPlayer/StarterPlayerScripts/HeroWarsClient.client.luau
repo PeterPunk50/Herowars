@@ -1138,25 +1138,11 @@ function Sig.arc(u,v) -- the rotation turning unit vector u onto v
 end
 -- The Great Sword captures hold the hilt in both hands, but retargeted onto his longer arms the left hand drifts off it in
 -- the fast swings, so after each frame's pose the left arm is solved (two-bone IK, elbow kept on the captured side) to
--- put the left fist on the sword at LeftGripY. Death Grip throws that hand out, so it is left alone there.
+-- put the left fist on the sword at LeftGripY. Where a wide swing takes the hilt beyond the left arm's reach (about 1 frame
+-- in 10), the sword and right arm are first pulled in toward the left shoulder by the shortfall. Death Grip throws that
+-- hand out, so it is left alone there.
 Sig.armJoints=setmetatable({},{__mode="k"})
-function Sig.twoHand(model,motors,p)
- if p and (p.name=="DeathGrip" or p.name=="Pin") then return end
- local sword=model:FindFirstChild("Greatsword"); local gy=sword and sword:FindFirstChild("LeftGripY"); local gf=model:FindFirstChild("LeftGripFrame")
- local sh,el,wr=motors.LeftShoulder,motors.LeftElbow,motors.LeftWrist
- local weld=sword and sword:FindFirstChild("GreatswordWeld"); local root=model:FindFirstChild("HumanoidRootPart")
- if not (gy and gf and sh and el and wr and weld and weld.Part0 and root and sh.Part0 and sh.Part1 and el.Part1) then return end
- -- world frames from the root through the joints as posed this frame (part CFrames only follow Transform a step later)
- local byPart=Sig.armJoints[model]
- if not byPart then byPart={}; for _,m in motors do if m.Part1 then byPart[m.Part1]=m end end; Sig.armJoints[model]=byPart end
- local cache={}
- local function world(part)
-  if part==root then return root.CFrame end
-  if cache[part] then return cache[part] end
-  local m=byPart[part]; local c=(m and m.Part0) and world(m.Part0)*m.C0*m.Transform*m.C1:Inverse() or part.CFrame
-  cache[part]=c; return c
- end
- local H=world(weld.Part0)*weld.C0*weld.C1:Inverse()*CFrame.new(0,gy.Value,0)*gf.Value:Inverse() -- the left hand on the hilt
+function Sig.solveArm(sh,el,wr,H,world) -- shoulder, elbow, wrist motors; H = the hand's wanted world CFrame
  local UT=world(sh.Part0); local J0=UT*sh.C0; local S=J0.Position
  local W=(H*wr.C1).Position
  local a=(el.C0.Position-sh.C1.Position).Magnitude; local b=(wr.C0.Position-el.C1.Position).Magnitude
@@ -1177,6 +1163,35 @@ function Sig.twoHand(model,motors,p)
  el.Transform=J1:Inverse()*LAn*el.C1
  local J2=LAn*wr.C0
  wr.Transform=J2:Inverse()*CFrame.new(J2.Position-H.Rotation:VectorToWorldSpace(wr.C1.Position))*H.Rotation*wr.C1
+end
+function Sig.twoHand(model,motors,p)
+ if p and (p.name=="DeathGrip" or p.name=="Pin") then return end
+ local sword=model:FindFirstChild("Greatsword"); local gy=sword and sword:FindFirstChild("LeftGripY"); local gf=model:FindFirstChild("LeftGripFrame")
+ local sh,el,wr=motors.LeftShoulder,motors.LeftElbow,motors.LeftWrist
+ local weld=sword and sword:FindFirstChild("GreatswordWeld"); local root=model:FindFirstChild("HumanoidRootPart")
+ if not (gy and gf and sh and el and wr and weld and weld.Part0 and root and sh.Part0 and sh.Part1 and el.Part1) then return end
+ -- world frames from the root through the joints as posed this frame (part CFrames only follow Transform a step later)
+ local byPart=Sig.armJoints[model]
+ if not byPart then byPart={}; for _,m in motors do if m.Part1 then byPart[m.Part1]=m end end; Sig.armJoints[model]=byPart end
+ local cache={}
+ local function world(part)
+  if part==root then return root.CFrame end
+  if cache[part] then return cache[part] end
+  local m=byPart[part]; local c=(m and m.Part0) and world(m.Part0)*m.C0*m.Transform*m.C1:Inverse() or part.CFrame
+  cache[part]=c; return c
+ end
+ local Hr=world(weld.Part0)
+ local H=Hr*weld.C0*weld.C1:Inverse()*CFrame.new(0,gy.Value,0)*gf.Value:Inverse() -- the left hand on the hilt
+ local S=(world(sh.Part0)*sh.C0).Position; local W=(H*wr.C1).Position
+ local reach=((el.C0.Position-sh.C1.Position).Magnitude+(wr.C0.Position-el.C1.Position).Magnitude)*0.96
+ local over=(W-S).Magnitude-reach
+ local rs,re,rw=motors.RightShoulder,motors.RightElbow,motors.RightWrist
+ if over>0 and rs and re and rw and rs.Part0 and rs.Part1 and re.Part1 then
+  local shift=(S-W).Unit*over
+  Sig.solveArm(rs,re,rw,Hr+shift,world)
+  H=H+shift
+ end
+ Sig.solveArm(sh,el,wr,H,world)
 end
 Sig.LOOPS={Wraithstep={idle="idle",run="run"},Solarion={idle="idle"},Tempest={idle="idle"},Valkyra={idle="idle",run="run"},DreadKnight={idle="idle",run="run"}}
 function Sig.mocapName(model,p,state)
