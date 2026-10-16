@@ -54,3 +54,20 @@ little bigger".
   - Every move plays its new capture: Light 1.00 s, Doom Cleave 1.83 s, Death Grip 1.17 s, Soul Reaper 2.20 s,
     Blight Ground 3.53 s, Grave Strike 1.23 s, block 1.00 s.
   - Console clean. Screenshots: `~/Downloads/HeroWars_dreadknight/V60b_*.jpg`.
+
+## Finish check (2026-10-16, ~18:10, no rebuild)
+
+- **Rules check** (`tools/check_rules_dk.luau`, now reading Dread Knight's own values; it had been copied from Valkyra's
+  check, and it now requires the modules from a scratch folder so they load):
+  - All 8 shared modules load.
+  - "Dread Knight", 125 HP, speed 14, no flight, no Super, Bone Armour (Shield, absorb 30).
+  - Reaper's Cut 7, Doom Cleave 18, Death Grip 8 at range 40, Soul Reaper 14, Grave Strike 4.
+  - 11 dreadknight captures; VarnT has the 5.46-stud sword, both fists and LeftGripFrame.
+- **Dummy hits** (V60_pre, `hit_test.py`): Reaper's Cut 7; Doom Cleave 18 (dummy knocked back to 14.8 studs); Death Grip 8
+  (pulled 25 -> 3.5 studs); Soul Reaper 20 (14 + drain); Grave Strike 4; Blight Ground burning (6 in the first read);
+  Bone Armour sets ShieldHP 30.
+- **Full place** `HeroWars_V60_DreadKnight.rbxlx` (built 17:50, opened as is):
+  - Has VarnT with sword and fists, plus the Vyrath boss (ServerStorage.VyrathBoss) and its HUD.
+  - In Play as Dread Knight: same fist, sword and grip values; every move plays its capture; left fist 0 of 1,800 frames
+    off the hilt; console clean.
+  - Light shows speed 0 at 0.3 s because the 1 s swing plays at 3× and holds its end, as before.
