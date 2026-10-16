@@ -1,0 +1,5 @@
+# Place files are 200+ MB and live outside the repo (and outside iCloud-synced ~/Documents):
+#   ~/Downloads/HeroWars_vyrath_redo/
+*.rbxl
+*.rbxlx
+*.lock
