@@ -13,7 +13,7 @@ local solar={
 }
 function Motion.update(model,root,now)
  local hero=model:GetAttribute("Hero")
- if hero~="Solarion" and hero~="Tempest" and hero~="Bulwark" and hero~="Wraithstep" then return end
+ if hero~="Solarion" and hero~="Tempest" and hero~="Bulwark" and hero~="Wraithstep" and hero~="Valkyra" then return end -- V59: Valkyra flies
  local hum=model:FindFirstChildOfClass("Humanoid"); if not hum then return end
  local s=Motion.states[model]
  if not s then s={transforms={},last=now,name="Ground",since=now}; Motion.states[model]=s end
@@ -104,7 +104,7 @@ function Motion.attack(model,motors,p,now)
  if not p then return end
  local hero=model:GetAttribute("Hero")
  if p.name=="Hurt" then
-  local tilt=({Solarion=-8,Tempest=-16,Bulwark=7,Wraithstep=18})[hero] or 0
+  local tilt=({Solarion=-8,Tempest=-16,Bulwark=7,Wraithstep=18,Valkyra=-6})[hero] or 0
   if motors.Waist then motors.Waist.Transform*=CFrame.Angles(math.rad(tilt),0,math.rad(tilt*.35)) end
   return
  end
@@ -143,7 +143,7 @@ function Motion.ground(model,motors,now)
  local root=model:FindFirstChild("HumanoidRootPart"); local hum=model:FindFirstChildOfClass("Humanoid")
  if not root or not hum or hum.FloorMaterial==Enum.Material.Air then return end
  local hero=model:GetAttribute("Hero")
- local profile=({Solarion={lean=-3,stride=30,arm=28,rate=1.8,bob=.04},Tempest={lean=2,stride=18,arm=10,rate=1.5,bob=.07},Bulwark={lean=-10,stride=23,arm=12,rate=1.35,bob=.075},Wraithstep={lean=-19,stride=35,arm=13,rate=2.3,bob=.035}})[hero]
+ local profile=({Solarion={lean=-3,stride=30,arm=28,rate=1.8,bob=.04},Tempest={lean=2,stride=18,arm=10,rate=1.5,bob=.07},Bulwark={lean=-10,stride=23,arm=12,rate=1.35,bob=.075},Valkyra={lean=-4,stride=26,arm=14,rate=1.7,bob=.05},Wraithstep={lean=-19,stride=35,arm=13,rate=2.3,bob=.035}})[hero]
  if not profile then return end
  local speed=Vector3.new(root.AssemblyLinearVelocity.X,0,root.AssemblyLinearVelocity.Z).Magnitude
  local run=math.clamp(speed/10,0,1)
@@ -154,6 +154,7 @@ function Motion.ground(model,motors,now)
  local target=pose({profile.lean,0,0},{0,wave*(hero=="Wraithstep" and 9 or 4),0},{profile.arm*wave,0,8},{-profile.arm*wave,0,-8},{20,0,0},{20,0,0},{profile.stride*wave,0,4},{-profile.stride*wave,0,-4})
  if hero=="Tempest" then target.RightShoulder={-22+wave*8,0,25+breath}; target.LeftShoulder={-22-wave*8,0,-25-breath}; target.RightElbow={65,0,0}; target.LeftElbow={65,0,0}
  elseif hero=="Bulwark" then target.LeftShoulder={-55,0,-18}; target.LeftElbow={95,0,0}; target.RightElbow={65,0,0}
+ elseif hero=="Valkyra" then target.LeftShoulder={-40,0,-15}; target.LeftElbow={85,0,0}; target.RightElbow={40,0,0} -- V59: shield arm carried, spear arm loose
  elseif hero=="Wraithstep" then target.RightShoulder={20+wave*12,0,15}; target.LeftShoulder={-15-wave*12,0,-18}; target.RightElbow={85,0,0}; target.LeftElbow={75,0,0}; target.Waist={8,-12,0}
  end
  target.RightKnee={-math.max(0,-wave)*30,0,0}; target.LeftKnee={-math.max(0,wave)*30,0,0}

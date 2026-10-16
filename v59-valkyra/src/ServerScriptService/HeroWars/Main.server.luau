@@ -517,7 +517,7 @@ local function spawnFighter(player,hero,isDummy,skinId,ring)
  model.Parent=workspace
  Appearance.ownJoints(model); task.defer(Appearance.ownJoints,model) -- v50b: see Appearance.ownJoints
  Appearance.ensureShield(model,hero,skin) -- V49e: the catalog shield can miss the very first build (template yield); put it on if absent
- local SPAWN_X={Solarion=-10,Wraithstep=10,Tempest=-18,Bulwark=18}
+ local SPAWN_X={Solarion=-10,Wraithstep=10,Tempest=-18,Bulwark=18,Valkyra=-26} -- V59: Valkyra
  local origin=isDummy and Vector3.new(0,4,spotZ("Dummy",-22)) or Vector3.new(SPAWN_X[hero] or 0,4,spotZ("Player",22))
  if practice then origin=D.practiceSpot(ring) end
  -- R65 (Peter: "sometimes the toon is below the ground"): stand the fighter on the real floor under its spot
@@ -732,7 +732,7 @@ local teleportTarget, endInvisible
 local function hurtState(s)
  if tick<(s.downUntil or 0) then return "Down" end
  local a=s.action
- if a and a.name=="Pounce" and Rules.phase(a.move,a.frame,a.extra)=="Startup" then return "Crouch" end
+ if a and Rules.isPounce(a.name) and Rules.phase(a.move,a.frame,a.extra)=="Startup" then return "Crouch" end
  if s.flying or s.hum.FloorMaterial==Enum.Material.Air then return "Air" end
  return "Stand"
 end
@@ -745,7 +745,7 @@ end
 -- The attacking arm/leg is hittable while a melee move is Active or recovering (whiff punishes).
 local function limbFor(s)
  local a=s.action
- if not a or not Rules.isMelee(a.name) or a.name=="Pounce" then return nil end
+ if not a or not Rules.isMelee(a.name) or Rules.isPounce(a.name) then return nil end
  local phase=Rules.phase(a.move,a.frame,a.extra)
  if phase~="Active" and phase~="Recovery" then return nil end
  local depth=a.move.Range*Rules.Limb.Depth
@@ -885,6 +885,8 @@ local function startAttack(s,input,quiet)
  end
  s.cooldowns[name]=tick+cooldown; s.lastCombat=tick; s.recoverBy=nil
  s.action={name=name,move=move,frame=0,hit={},aim=s.aim,confirmed=false,extra=0,leapUp=leapUp,target=doorTarget}
+ -- V59: Valkyra's Winged Rush can't be hit for its first Untouchable ticks.
+ if move.Untouchable then s.invulnerable=math.max(s.invulnerable,tick+move.Untouchable) end
  if move.Super then
   -- Untouchable through the wind-up; every screen flashes and freezes for a moment (SF super flash).
   s.super=0; s.invulnerable=math.max(s.invulnerable,tick+move.Startup)
@@ -895,7 +897,7 @@ local function startAttack(s,input,quiet)
  local flat=Vector3.new(s.aim.X,0,s.aim.Z)
  if flat.Magnitude>0.01 and not s.owned then s.root.CFrame=CFrame.lookAt(s.root.Position,s.root.Position+flat) end
  local landing
- if name=="Pounce" then
+ if Rules.isPounce(name) then -- V59: Valkyrie Dive leaps the same way
   slideParams.FilterDescendantsInstances={s.model}
   s.action.target=pounceTarget(s,s.aim,move)
   landing=pounceLanding(s,s.action)
@@ -1192,7 +1194,7 @@ local function hitTargets(s,a)
   -- v28 Solar Flare: a burst all round the attacker.
   center=CFrame.new(s.root.Position); size=Vector3.new(move.Aoe*2,move.Height,move.Aoe*2)
  end
- if a.name=="Pounce" then
+ if Rules.isPounce(a.name) then
   -- Body hitbox that travels with the leap.
   center=s.root.CFrame; size=Vector3.new(move.Width,move.Height,move.Width)
  end
@@ -1826,13 +1828,13 @@ local previewFolder=Instance.new("Folder"); previewFolder.Name="Previews"; previ
 -- R30: no 2-second head start for the fighters any more; skins build first. Building them also warms
 -- Appearance's gear and shield caches, so in-game skin changes are instant too. Total = how many looks.
 local previewQueue={}; local previewBase={}
-do local n=0; for _,h in {"Solarion","Wraithstep","Tempest","Bulwark"} do n+=#Rules.Skins[h].Order end; previewFolder:SetAttribute("Total",n) end
+do local n=0; for _,h in {"Solarion","Wraithstep","Tempest","Bulwark","Valkyra"} do n+=#Rules.Skins[h].Order end; previewFolder:SetAttribute("Total",n) end
 local function previewFirst(hero,id)
  local q=previewQueue[hero]; if not q or previewFolder:FindFirstChild(hero.."|"..id) then return end
  local i=table.find(q,id); if i then table.remove(q,i) end
  table.insert(q,1,id)
 end
-for _,hero in {"Solarion","Wraithstep","Tempest","Bulwark"} do
+for _,hero in {"Solarion","Wraithstep","Tempest","Bulwark","Valkyra"} do
  previewQueue[hero]=table.clone(Rules.Skins[hero].Order)
  task.spawn(function()
   local q=previewQueue[hero]
@@ -2437,7 +2439,7 @@ local function update(s)
  local frozen=tick<(s.hitstop or 0)
  local held=tick<(s.holdUntil or 0)
  if tick-(s.lastMove or -600)>30 then s.dir=Vector3.zero; s.lock=false end
- local pouncing=s.action and (s.action.name=="Pounce" or s.action.leapUp) and Rules.phase(s.action.move,s.action.frame,s.action.extra)~="Recovery"
+ local pouncing=s.action and (Rules.isPounce(s.action.name) or s.action.leapUp) and Rules.phase(s.action.move,s.action.frame,s.action.extra)~="Recovery"
  -- v30 step C: the server moves the fighter while something forces it; otherwise its own client does.
  local forced=not s.player or (locked and not s.blockStunned) or held or pouncing or s.knock or s.pull or s.carry
   or s.whirl or s.snare or s.launch or (s.action and s.action.move.Teleport)
@@ -2748,7 +2750,7 @@ local function update(s)
    -- Step in behind the punch so even a miss has weight.
    slide(s,flatUnit(a.aim,s.root.CFrame.LookVector)*a.move.Lunge/a.move.Startup)
   end
-  if a.name=="Pounce" and phase=="Active" and not a.landed then pounceStep(s,a)
+  if Rules.isPounce(a.name) and phase=="Active" and not a.landed then pounceStep(s,a)
   elseif a.leapUp and phase=="Active" then chargeLeapStep(s,a)
   elseif a.move.Teleport or a.move.ShadowCircle or a.move.SolarAbsorb or a.move.Phase then -- no hitbox
   elseif phase=="Active" and a.move.Pulses then
@@ -2905,7 +2907,7 @@ task.spawn(function()
 end)
 -- R66-ui: a still practice dummy beside every duel ring except the first (the sparring bot stands there).
 task.delay(8,function()
- local heroes={"Bulwark","Tempest","Solarion","Wraithstep"}
+ local heroes={"Bulwark","Tempest","Solarion","Wraithstep","Valkyra"}
  for i=2,#D.rings() do
   local ok,err=pcall(spawnFighter,nil,heroes[(i-2)%#heroes+1],"practice",nil,i); if not ok then warn("Practice dummy: "..tostring(err)) end
  end

@@ -7,7 +7,7 @@ local Surface=require(script.Parent.SurfaceFX)
 local Rules=require(script.Parent.Rules)
 local FX={active=0,limit=UIS.TouchEnabled and 90 or 180}
 local folder=Instance.new("Folder"); folder.Name="HeroPowerFX"; folder.Parent=workspace
-local colors={Solarion=Color3.fromRGB(255,170,45),Wraithstep=Color3.fromRGB(145,83,217),Tempest=Color3.fromRGB(147,225,255),Bulwark=Color3.fromRGB(163,174,185)}
+local colors={Solarion=Color3.fromRGB(255,170,45),Wraithstep=Color3.fromRGB(145,83,217),Tempest=Color3.fromRGB(147,225,255),Bulwark=Color3.fromRGB(163,174,185),Valkyra=Color3.fromRGB(240,196,80)} -- V59: Valkyra gold
 function FX.visible(model)
  local root=model and model:FindFirstChild("HumanoidRootPart")
  local camera=workspace.CurrentCamera
@@ -420,5 +420,90 @@ function FX.ground(model,at,kind)
   sunburst(at+Vector3.new(0,1,0),colors.Solarion,2.5,0.35); sound(FIRE,at,0.6,0.8) -- R40
   Surface.scorch(model,at,Rules.Moves.Pounce.Splash)
  else Surface.quake(model,at,3) end -- Titan Drop hits its carried victim, not a ten-stud area.
+end
+
+-- V59 (Peter, 2026-10-16): Valkyra's own effect kit, gold light and feathers. Her branches wrap the shared functions,
+-- so the other heroes' effects are untouched.
+local VALK_CORE=Color3.fromRGB(255,250,225); local VALK_BLUE=Color3.fromRGB(127,196,255)
+local function feathers(at,count) motes("ValkyrieFeathers",at,VALK_CORE,count,false); motes("ValkyrieGlints",at,colors.Valkyra,math.ceil(count/2),false) end
+local baseAttack,baseImpact,baseDefensive=FX.attack,FX.impact,FX.defensive
+function FX.attack(model,name,aim,move,delaySeconds,still)
+ if model:GetAttribute("Hero")~="Valkyra" then return baseAttack(model,name,aim,move,delaySeconds,still) end
+ if not FX.visible(model) then return end
+ local col=colors.Valkyra; local root=model:FindFirstChild("HumanoidRootPart"); if not root then return end
+ aim=(aim and aim.Magnitude>0.01) and aim.Unit or root.CFrame.LookVector
+ local function at(fn) task.delay(math.max(0,delaySeconds or 0),function() if model.Parent and (not still or still()) then fn() end end) end
+ local step=tonumber(string.match(name,"^Light(%d)$"))
+ if name=="JavelinOfLight" then
+  -- a spear of light forms in her raised hand, then streaks out along the aim and bursts where it stops
+  local hand=model:FindFirstChild("RightHand")
+  if hand then part("JavelinForm",CFrame.lookAt(hand.Position,hand.Position+aim),Vector3.new(0.18,0.18,3.2),VALK_CORE,math.max(0.15,delaySeconds or 0.2)) end
+  at(function()
+   local h=model:FindFirstChild("RightHand"); local a=(h and h.Position or root.Position+Vector3.new(0,1.5,0))
+   local b=a+aim*(move.Range or 40)
+   local rp=RaycastParams.new(); rp.FilterType=Enum.RaycastFilterType.Exclude; rp.FilterDescendantsInstances={model}
+   local hit=workspace:Raycast(a,b-a,rp); if hit then b=hit.Position end
+   line("JavelinTrail",a,b,0.32,col,0.3); line("JavelinCore",a,b,0.12,VALK_CORE,0.22)
+   part("JavelinHead",CFrame.lookAt(b-aim*1.2,b),Vector3.new(0.5,0.5,2.4),VALK_CORE,0.35)
+   shards(b,col,8,false); feathers(b,10); flashLight(b,col,18,0.25); sound(WHOOSH,a,0.55,1.25); sound(ZAP,b,0.4,1.4)
+  end)
+ elseif name=="ValkyrieDive" then
+  -- wings of light flare as she springs; a pillar and a ring of light where she lands
+  ring("DiveLaunch",root.Position-Vector3.new(0,2.6,0),2.2,col,0.3); feathers(root.Position,10); sound(WHOOSH,root.Position,0.6,0.85)
+  at(function()
+   task.wait(0.35)
+   local r=model:FindFirstChild("HumanoidRootPart"); if not r then return end
+   local g=r.Position-Vector3.new(0,2.6,0)
+   ring("DiveImpact",g,move.Splash or 7,col,0.4); ring("DiveImpactCore",g,(move.Splash or 7)*0.55,VALK_CORE,0.3)
+   line("DivePillar",g,g+Vector3.new(0,14,0),0.9,VALK_CORE,0.35); shards(g,col,10,false); feathers(g+Vector3.new(0,1,0),16)
+   flashLight(g,col,24,0.3); sound(THUNDER,g,0.35,1.5)
+  end)
+ elseif name=="WingedRush" then
+  -- a streak of feathers and light behind her through the dash
+  sound(WHOOSH,root.Position,0.6,1.1)
+  task.spawn(function()
+   local last=root.Position; local t0=os.clock()
+   while os.clock()-t0<0.45 and model.Parent do
+    local r=model:FindFirstChild("HumanoidRootPart"); if not r then break end
+    line("RushStreak",last,r.Position,0.45,col,0.3); feathers(r.Position,3); last=r.Position
+    task.wait(0.05)
+   end
+  end)
+ elseif name=="SkyToss" then
+  at(function() local g=root.Position+aim*2; line("SkyTossColumn",g,g+Vector3.new(0,10,0),0.5,col,0.3); feathers(g+Vector3.new(0,3,0),8) end)
+ elseif step or name=="Heavy" then
+  -- spear thrusts are a line of light from her spear hand; the bash is a shield arc; the rising wing is an upward arc
+  at(function()
+   local hand=model:FindFirstChild(step==2 and "LeftHand" or "RightHand"); local o=hand and hand.Position or root.Position
+   if step==2 then ring("ShieldBashArc",o+aim*1.2,1.4,VALK_BLUE,0.2,CFrame.lookAt(Vector3.zero,aim).Rotation*CFrame.Angles(math.pi/2,0,0))
+   elseif step==3 then ring("RisingWingArc",root.Position+aim*1.5,2.2,col,0.25,CFrame.lookAt(Vector3.zero,aim).Rotation); feathers(root.Position+aim*1.5,6)
+   else
+    local len=name=="Heavy" and 6 or 3.2
+    line("SpearThrust",o,o+aim*len,name=="Heavy" and 0.22 or 0.14,col,0.18); line("SpearThrustCore",o,o+aim*len,0.06,VALK_CORE,0.14)
+    if name=="Heavy" then feathers(o+aim*len,8); sound(WHOOSH,o,0.5,0.9) end
+   end
+  end)
+ end
+end
+function FX.impact(target,attacker,name,result)
+ if not (attacker and attacker:GetAttribute("Hero")=="Valkyra") or result=="Dodge" or result=="Parry" or result=="Block" then return baseImpact(target,attacker,name,result) end
+ if not FX.visible(target) then return end
+ local root=target:FindFirstChild("HumanoidRootPart"); if not root then return end
+ local p=root.Position+Vector3.new(0,0.7,0)
+ shards(p,colors.Valkyra,7,false); feathers(p,8); ring("ValkyrieHitRing",p,1.5,VALK_CORE,0.2,CFrame.Angles(math.pi/2,0,0)); flashLight(p,colors.Valkyra,12,0.18)
+end
+function FX.defensive(model)
+ if model:GetAttribute("Hero")~="Valkyra" then return baseDefensive(model) end
+ if not FX.visible(model) then return end
+ -- Aegis Wings: two great wings of light fold round her shield
+ local root=model:FindFirstChild("HumanoidRootPart"); if not root then return end
+ local cf=root.CFrame
+ for _,side in {-1,1} do
+  for i=1,5 do
+   local a=cf:PointToWorldSpace(Vector3.new(side*0.8,1.2,0)); local b=cf:PointToWorldSpace(Vector3.new(side*(1.6+i*0.45),2.6-i*0.55,-0.6-i*0.25))
+   line("AegisWingFeather",a,b,0.16,i%2==0 and VALK_CORE or colors.Valkyra,0.6)
+  end
+ end
+ ring("AegisWingsGuard",root.Position,2.4,colors.Valkyra,0.5,CFrame.Angles(math.pi/2,0,0)); feathers(root.Position,12)
 end
 return FX

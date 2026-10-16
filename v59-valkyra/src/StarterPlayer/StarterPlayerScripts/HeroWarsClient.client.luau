@@ -157,7 +157,7 @@ local heroRow=Instance.new("Frame"); heroRow.Name="CharacterChoice"; heroRow.Bac
 heroRow.Size=UDim2.fromOffset(260,40); heroRow.LayoutOrder=0; heroRow.Parent=panel
 -- v25: four heroes.
 local HERO_BUTTON_COLORS={Solarion=Color3.fromRGB(33,81,143),Wraithstep=Color3.fromRGB(93,55,134),
- Tempest=Color3.fromRGB(40,110,140),Bulwark=Color3.fromRGB(100,108,122)}
+ Tempest=Color3.fromRGB(40,110,140),Bulwark=Color3.fromRGB(100,108,122),Valkyra=Color3.fromRGB(47,79,168)} -- V59: Valkyra
 -- R30 (Peter): the four hero buttons are gone; pick a hero in the Lobby (PLAY AS). This row now holds
 -- only the Lobby and Pause buttons.
 local debugOn=false; local flyUp=false; local flyDown=false; local flying=false
@@ -698,6 +698,10 @@ Sig.HERO={
  Bulwark={hit="bronze",whiffFx="stumble",step="quake",landFx="quake",text=Color3.fromRGB(255,190,110),
   swingL={"swingHeavy",0.5,1.15},swingH={"swingHeavy",0.75,0.7},hitL={"punchHeavy",0.7,1.1},hitH={"clang",0.85,0.8},
   whiff={"grunt",0.5,0.9},dash={"stomp",0.6,1.1},land={"stomp",0.8,0.85},block={"clang",0.6,1.2}},
+ -- V59 Valkyra: light, quick spear-and-shield sounds and a gold flash on impact.
+ Valkyra={hit="sun",whiffFx="ember",step="breeze",landFx="gust",text=Color3.fromRGB(255,214,120),
+  swingL={"swingFast",0.45,1.25},swingH={"swingHeavy",0.6,1.0},hitL={"punchLight",0.6,1.2},hitH={"clang",0.75,1.1},
+  whiff={"fizz",0.3,1.5},dash={"wind",0.55,1.3},land={"land",0.55,1.1},block={"block",0.5,1.15}},
 }
 -- Per-move overrides: cast sound at release, hit sound, impact style, and the victim's reaction.
 Sig.MOVE={
@@ -715,6 +719,11 @@ Sig.MOVE={
  DimensionDoor={cast={"portal",0.7,0.8},charge={"charge",0.45,0.7}},
  TitanDrop={cast={"grunt",0.7,0.8},hitSnd={"stomp",1,0.7},hit="quake",react="body"},
  Throw={cast={"swingFast",0.5,0.9},react="spin"},
+ -- V59 Valkyra
+ JavelinOfLight={cast={"swingFast",0.7,1.3},charge={"charge",0.4,1.4},hitSnd={"zap",0.8,1.2},hit="sun",react="shock"},
+ ValkyrieDive={cast={"dash",0.7,1.0},hitSnd={"explosion",0.7,1.3},hit="sunquake",react="body"},
+ WingedRush={cast={"wind",0.75,1.3},hitSnd={"punchHeavy",0.8,1.1},hit="sun",react="stagger"},
+ SkyToss={cast={"swingFast",0.5,1.1},react="launch"},
 }
 -- Victim reactions per hero for the basic attacks (moves above override these).
 Sig.REACT={
@@ -722,6 +731,7 @@ Sig.REACT={
  Wraithstep={Light1="claw",Light2="claw",Light3="spin",Heavy="claw"},
  Tempest={Light1="shock",Light2="shock",Light3="launch",Heavy="shock"},
  Bulwark={Light1="jab",Light2="stagger",Light3="body",Heavy="stagger"},
+ Valkyra={Light1="jab",Light2="stagger",Light3="launch",Heavy="body"}, -- V59
 }
 -- Hurt poses by reaction (joint angles, same keys as KEYS). jitter = shakes while it holds (electric).
 Sig.HURTS={
@@ -970,6 +980,8 @@ Sig.LIMB={
   Lightning={"RightHand"},Beam={"RightHand"},Grapple={"RightHand"},Whirlwind={"RightHand","LeftHand"},SolarFlare={"RightHand","LeftHand"}},
  Tempest={Light1={"LeftHand"},Light2={"RightHand"},Light3={"LeftFoot"}},
  Bulwark={Light1={"LeftHand"},Light2={"SwordBlade"},Light3={"RightFoot"},Heavy={"SwordBlade"},Slam={"SwordBlade","LeftHand"}},
+ Valkyra={Light1={"RightHand"},Light2={"LeftHand"},Light3={"RightFoot"},Heavy={"RightHand"},JavelinOfLight={"RightHand"}, -- V59
+  ValkyrieDive={"RightHand","LeftHand"},WingedRush={"LeftHand"},SkyToss={"RightHand","LeftHand"}},
 }
 function Sig.trailOn(part,accent)
  local tr=part:FindFirstChild("SigTrail")
@@ -1044,7 +1056,9 @@ end)
 Sig.MOCAP_FILE={SolarFlare="flare",ShadowDoor="door",DimensionDoor="door",ChargeLeap="leap"}
 -- v49: the Interrupt and Super moves borrow one of the hero's existing moves for pose and capture.
 Sig.ALIAS={Solarion={Interrupt="Light2",Heavy="Beam"},Wraithstep={Interrupt="Light1",Super="Uppercut"},
- Tempest={Interrupt="Lightning",Super="Lightning"},Bulwark={Interrupt="Light1",Super="Slam"}}
+ Tempest={Interrupt="Lightning",Super="Lightning"},Bulwark={Interrupt="Light1",Super="Slam"},
+ -- V59: Valkyra's moves borrow the nearest generic pose keys; her captures are named after these (valkyra_lightning ...).
+ Valkyra={JavelinOfLight="Lightning",ValkyrieDive="Pounce",WingedRush="Charge",SkyToss="Throw"}}
 function Sig.alias(hero,name) local a=Sig.ALIAS[hero or ""]; return a and a[name] or name end
 Sig.MOCAP_REACT={jab="hit_head",claw="hit_head",shock="hit_shock",body="hit_body",burn="hit_body",pull="hit_body",
  stagger="hit_side",spin="hit_side",launch="hit_side"}
@@ -1053,8 +1067,9 @@ Sig.mocapIds={}; Sig.mocapCache=setmetatable({},{__mode="k"}); Sig.mocapNow=setm
 Sig.MOCAP_OVERRIDE={Bulwark={Interrupt="bulwark_shieldthrow"},Solarion={Heavy="solarion_heavy"}} -- V56: Solar Hammer plays its own (Blender) capture, not the Beam alias
 -- v50 captured ground loops per hero: Wraithstep stays crouched (idle) and runs low with his arms back (run);
 -- Solarion and Tempest have an idle. A hero without a run keeps the Roblox run.
--- V52: Valkyra (the Bulwark slot) idles with her shield up and jogs, from the Quaternius animation library (build_valkyra_captures.py).
-Sig.LOOPS={Wraithstep={idle="idle",run="run"},Solarion={idle="idle"},Tempest={idle="idle"},Bulwark={idle="idle",run="run"}}
+-- V52 gave the Bulwark slot Valkyra's shield idle and jog; V59 moves them to her own hero (valkyra_idle, valkyra_run) and
+-- Bulwark is back on his knight set (no captured loops, as in V51).
+Sig.LOOPS={Wraithstep={idle="idle",run="run"},Solarion={idle="idle"},Tempest={idle="idle"},Valkyra={idle="idle",run="run"}}
 function Sig.mocapName(model,p,state)
  local hero=string.lower(Sig.heroOf(model))
  if p then
@@ -1522,7 +1537,7 @@ local function playMove(model,name,aim,landing)
    end)
    Debris:AddItem(startPart,out+back+0.15); Debris:AddItem(endPart,out+back+0.15)
   end)
- elseif name=="Pounce" then
+ elseif Rules.isPounce(name) then -- V59: Valkyrie Dive shows the same landing ring
   -- Crouch: a landing ring grows where Solarion will come down, then the leap leaves afterimages.
   local goal=typeof(landing)=="Vector3" and landing or root.Position+dir*16
   local floorAt=groundBelow(model,{Position=goal})
@@ -1536,6 +1551,10 @@ local function playMove(model,name,aim,landing)
    ring(groundBelow(model,root)+Vector3.new(0,0.1,0),Color3.fromRGB(200,190,170),7,0.3)
    afterimages(root,accent,8)
   end)
+ elseif name=="JavelinOfLight" then
+  -- V59 Valkyra: the throw line shows while the light spear forms in her hand (PowerFX draws the spear itself).
+  telegraph(root,aim,(reachAlong(model,root.Position,aim,move.Range)-root.Position).Magnitude,accent,startup,still,Vector3.new(0,0.8,0))
+  charge(model,"RightHand",accent,startup,1.4)
  elseif name=="Lightning" then
   -- Storm call: sparks gather above the raised hand, then a jagged bolt cracks to the target.
   local hand=model:FindFirstChild("RightHand") or root
@@ -2814,7 +2833,7 @@ end)
 -- also a visual you can rotate and change the skin"). Opens on join and from the Lobby button. The preview
 -- body is built by the server (Preview) in the chosen skin and spun here in a viewport; drag to turn it.
 do
- local HEROES={"Solarion","Wraithstep","Tempest","Bulwark"}
+ local HEROES={"Solarion","Wraithstep","Tempest","Bulwark","Valkyra"} -- V59: Valkyra is her own hero
  Sig.rigMove=function(m,f) -- V51: move a rig preview; a rig whose joints are connected moves as one piece, from its root
   local rr=m:FindFirstChild("HumanoidRootPart")
   if rr and #rr:GetConnectedParts(true)>0 then rr.CFrame=f(rr.CFrame)
@@ -2824,7 +2843,8 @@ do
   Solarion="Flying bruiser. Punch combos up close, photon pulses at range from Solar Hammer; leaps in with Pounce and lights up hidden enemies.",
   Wraithstep="Stealth assassin. No flight; pulls flyers down with his bats, vanishes, and hits harder from the shadows and inside his circle.",
   Tempest="Storm caster. A quick spark combo up close and long-reaching casts from the air; Gale pushes attackers away and Whirlwind locks one enemy down.",
-  Bulwark="Armoured tank. Most health, no flight; breaks guards, charges or leaps at flyers, and parries with her shield.",
+  Bulwark="Armoured tank. Most health, no flight; breaks guards, charges or leaps at flyers, and parries with his shield.",
+  Valkyra="Winged shieldmaiden. Flies; a quick spear combo, a javelin of light at range, dives from above and dashes through foes on her wings.",
  }
  local DESC={
   Solarion={Light="Three-hit punch combo. The third hit knocks back.",Heavy="Half-second charge, then three photon pulses fly out at range. Each pulse is a hit; an interrupt or a hit during the charge cancels it.",Interrupt="Fast sun-fist strike. Stops a cast and locks that power for 4 seconds.",
@@ -2842,6 +2862,13 @@ do
    Skill2="Unstoppable shoulder charge: hits can't stop it, it carries the target, and driving them into a wall stuns them and deals extra damage. Aim up at a flyer and it becomes a leap that slams them down.",
    Defensive="Raise the shield for 1 second. Every blow that lands on it, close up or from range, is reflected back at the attacker for its full damage, and they reel. Your first parry also gives Fury, readies Charge, a 25-point shield for 6.5 s and 3 s in which every blow you parry heals you 25% of it. A landed parry is ready again in 6 s.",
    Skill3="1-second cast, then teleport beside your target from up to 65 studs, even one in the air, and slam on arrival. The slam hits everyone close and drives a flyer into the floor."},
+  -- V59 Valkyra
+  Valkyra={Light="Three-hit spear and shield combo: Spear Jab, Shield Bash, then Rising Wing, a spinning leap kick that lifts.",Heavy="Valhalla Thrust: a lunging spear thrust that reaches 10 studs.",
+   Skill1="Javelin of Light: throw a spear of light in a straight line up to 40 studs. Knocks a flyer out of the air.",
+   Skill2="Valkyrie Dive: leap up and dive onto the enemy in front of you. A direct hit pins them; the landing splashes everyone near.",
+   Skill3="Winged Rush: a wing-boosted 16-stud dash through the enemy. You can't be hit for the first moment of it.",Dash="Quick dodge in the direction you're moving.",
+   Flight="Take off or land on your wings. Space rises, X descends. Uses flight energy.",
+   Defensive="Aegis Wings: your wings fold round your shield for 2 seconds and you take 60% less damage. Breaks stuns; 18 s cooldown."},
  }
  local function stats(hero,id)
   local name=id=="Light" and "Light1" or (id=="Heavy" or id=="Skill1" or id=="Skill2" or id=="Skill3" or id=="Interrupt") and Rules.moveName(hero,id,1) or nil
@@ -3664,6 +3691,9 @@ Sig.FLY={
   cruise={rs=2.95,re=0.05,ls=-0.3,le=0.3,wx=-0.25,nx=0.75,rh=-0.15,lh=-0.1,rk=-0.08,lk=-0.2,rx=-1.0}},
  Tempest={hover={rs=0.55,re=0.9,ls=0.55,le=0.9,rh=0.4,rk=-1.15,lh=-0.05,lk=-0.15,wx=0.05,nx=-0.05},
   cruise={rs=-0.75,re=0.3,ls=-0.75,le=0.3,wx=-0.2,rx=-0.55,nx=0.35,rh=-0.15,rk=-0.45,lh=0.15,lk=-0.7}},
+ -- V59 Valkyra: hovers upright with the shield held across her and the spear arm low; cruises spear-first like a diving bird.
+ Valkyra={hover={rs=0.35,re=0.6,ls=1.1,le=1.2,rh=0.2,rk=-0.5,lh=-0.05,lk=-0.2,wx=0.05},
+  cruise={rs=2.8,re=0.1,ls=1.0,le=1.3,wx=-0.25,nx=0.6,rh=-0.15,lh=-0.1,rk=-0.1,lk=-0.25,rx=-0.9}},
 }
 Sig.SNEAK={ry=-0.55,wx=-0.5,nx=0.35,rs=-0.45,re=1.25,ls=-0.45,le=1.25,rk=-0.75,lk=-0.75,rh=0.35,lh=0.35}
 Sig.flyState=setmetatable({},{__mode="k"})
@@ -3742,6 +3772,7 @@ local HERO_ANIMS={
  -- armoured stride) instead of sharing Solarion's Superhero set (IDs checked on economy.roblox.com).
  Tempest={idle=616136790,run=616140816,jump=616139451,fall=616134815},
  Bulwark={idle=657595757,run=657564596,jump=658409194,fall=657600338},
+ Valkyra={idle=616136790,run=616140816,jump=616139451,fall=616134815}, -- V59: the Stylish set under her own captured idle and run
 }
 local moveAnims={}
 local function heroTracks(model)
@@ -3854,7 +3885,7 @@ RunService.PreSimulation:Connect(function()
    J=evaluate(p,clock)
    if not J then poses[model]=nil end
   end
-  if not J and model:GetAttribute("Hero")=="Bulwark" and (model:GetAttribute("Blocking") or model:GetAttribute("Shielded") or model:GetAttribute("Parrying")) then J=SHIELD_GUARD end
+  if not J and (model:GetAttribute("Hero")=="Bulwark" or model:GetAttribute("Hero")=="Valkyra") and (model:GetAttribute("Blocking") or model:GetAttribute("Shielded") or model:GetAttribute("Parrying")) then J=SHIELD_GUARD end
   if not J and model:GetAttribute("Blocking") then J=GUARD end
   if not J and root and model:GetAttribute("Flying") then
    J=Sig.flyPose(model,root,now)
@@ -4632,7 +4663,7 @@ remote.OnClientEvent:Connect(function(kind,a,b,c,d,e,f,g,h,sneakBonus)
    local stun=(move and move.Stun or 12)*((b=="Counter" and (move and move.Stun or 12)<60) and Rules.CounterStun or 1)
    local p
    if h then p={name="Pin",start=now,dur=Rules.Knockdown/60+stopSec}
-   elseif (e=="Pounce" or e=="Grapple") and b~="Block" and c>=14 then p={name="Pin",start=now,dur=stun/60+stopSec}
+   elseif (Rules.isPounce(e) or e=="Grapple") and b~="Block" and c>=14 then p={name="Pin",start=now,dur=stun/60+stopSec}
    else
     p={name="Hurt",start=now,dur=b=="Block" and 0.15 or math.clamp(stun/60,0.2,0.6),
      power=b=="Block" and 0.3 or (b=="Counter" or c>=12) and 1.3 or 0.8,react=b~="Block" and Sig.react(d,e) or nil}
@@ -4658,7 +4689,7 @@ remote.OnClientEvent:Connect(function(kind,a,b,c,d,e,f,g,h,sneakBonus)
   if not pre and (c>0 or b=="Block") then VFX.impact(a,b,c,d,e) end
   if h then VFX.slam(a) end
   if involvesMe(a,d) and c>0 then
-   local big=e=="Heavy" or e=="TitanDrop" or e=="SolarFlare" or e=="Pounce" or e=="Uppercut" or e=="Grapple" or e=="Throw" or b=="Counter" or g or h
+   local big=e=="Heavy" or e=="TitanDrop" or e=="SolarFlare" or Rules.isPounce(e) or e=="SkyToss" or e=="Uppercut" or e=="Grapple" or e=="Throw" or b=="Counter" or g or h
    if not pre then shake(big and 0.9 or 0.35,big and 0.3 or 0.15) end
    -- v36: a heavy blow on me or by me flashes the screen and punches the camera in.
    if big and not pre then Sig.punch(a==player.Character and 1 or 0.7) end
@@ -4673,7 +4704,7 @@ remote.OnClientEvent:Connect(function(kind,a,b,c,d,e,f,g,h,sneakBonus)
   local p=poses[a]; local move=heroMoveOf(a,b)
   if p and p.name==b and move then p.whiff=true; p.extra=move.Whiff end
   local root=a and a:FindFirstChild("HumanoidRootPart")
-  if root and move and b~="Pounce" then
+  if root and move and not Rules.isPounce(b) then
    local reach=root.Position+root.CFrame.LookVector*math.min(move.Range,12)+Vector3.new(0,0.4,0)
    burst(reach,Color3.fromRGB(225,225,235),1.2,0.15)
    Sig.whiff(a,b,reach,b=="Heavy" or move.Startup>=14)

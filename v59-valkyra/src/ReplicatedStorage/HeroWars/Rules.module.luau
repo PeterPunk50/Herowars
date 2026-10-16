@@ -81,7 +81,7 @@ Rules.Bot = {
  Hard = {Think = {8, 16}, Block = 0.50, Evade = 0.15, Attack = 0.70, AntiAir = 0.50, Dash = 0.10, Trinket = 0.8, Ranged = 0.45},
  -- v27: the bot can be any hero (bot hero button). Trinket: chance to use its defensive to break a
  -- long stun or a knockdown. Ranged: chance per decision to use a long-range Skill 1 (Beam, Lightning).
- Heroes = {"Wraithstep", "Solarion", "Tempest", "Bulwark"},
+ Heroes = {"Wraithstep", "Solarion", "Tempest", "Bulwark", "Valkyra"}, -- V59: Valkyra is her own hero
 }
 -- Skins (v15): the HeroWars Skin & Animation Kit's looks. Cosmetic only.
 -- Palette = the kit's six colour zones (hex): Primary suit, Secondary lower arms/legs and gauntlets,
@@ -620,16 +620,16 @@ do
  local sk = Rules.Skins.Bulwark.DreadKnight; sk.Suit = {Rules.hex(sk.Palette.Primary)}; sk.Accent = {Rules.hex(sk.Palette.Emissive)}
  local o = Rules.Skins.Bulwark.Order; table.insert(o, (table.find(o, "Paladin") or 0) + 1, "DreadKnight") -- second in the picker, after the Paladin
 end
--- V51 (Peter: "replace Bulwark with a Valkyra name"): Bulwark is shown as Valkyra. The hero key stays "Bulwark" in code (moves, stats, captures);
--- her native skinned rig (the imported Valkyra with her own armour welded on) is his default skin. Rules.display() is the name players see.
-Rules.Display = {Bulwark = "Valkyra"}
+-- V51 (Peter: "replace Bulwark with a Valkyra name") showed Bulwark as Valkyra. V59 (Peter, 2026-10-16: "her own shield and
+-- move different to bulwark"): Valkyra is her own hero instead, so Bulwark is Bulwark again. Rules.display() is the name players see.
+Rules.Display = {}
 function Rules.display(hero) return Rules.Display[hero] or hero end
-Rules.Skins.Bulwark.Valkyra = kit("Valkyra", "2F4FA8", "5A6372", "C9CED8", "D8A838", "7FC4FF", "10131C",
- {Slam = {Glow = true}, Charge = {Trail = true}}, {Cloth = "2F5FC0", Flesh = "D9A07A"})
-Rules.Skins.Bulwark.Valkyra.Rig = "ValkyraN" -- her own shield and armour are welded into the rig, so no Gear
+Rules.Skins.Valkyra = {Order = {"Valkyra"}}
+Rules.Skins.Valkyra.Valkyra = kit("Valkyra", "2F4FA8", "5A6372", "C9CED8", "D8A838", "7FC4FF", "10131C",
+ {JavelinOfLight = {Glow = true}, ValkyrieDive = {Glow = true}, WingedRush = {Trail = true}}, {Cloth = "2F5FC0", Flesh = "D9A07A"})
+Rules.Skins.Valkyra.Valkyra.Rig = "ValkyraN" -- her armour and her winged shield are welded into the rig, so no Gear
 do
- local sk = Rules.Skins.Bulwark.Valkyra; sk.Suit = {Rules.hex(sk.Palette.Primary)}; sk.Accent = {Rules.hex(sk.Palette.Emissive)}
- table.insert(Rules.Skins.Bulwark.Order, 1, "Valkyra") -- first = the default skin
+ local sk = Rules.Skins.Valkyra.Valkyra; sk.Suit = {Rules.hex(sk.Palette.Primary)}; sk.Accent = {Rules.hex(sk.Palette.Emissive)}
 end
 -- V54 (Peter: "tripo created 2 toons ... test their rigs and animations"): Tripo's Gravehold Titan, a skinned R15 rig like VarnT. No shield: stone fists.
 Rules.Skins.Bulwark.GraveholdTitan = kit("Gravehold Titan", "6E7378", "3E4246", "9AA0A5", "FF7A1F", "FFB066", "16181A",
@@ -934,4 +934,53 @@ end
 -- (Sig.mocap aligns the Hit keyframe with Startup+Active/2 and clamps the speed to 0.5..3x, so the ticks must match).
 do local l=Rules.HeroMoves.Solarion.Light1; l.Startup=32; l.Active=3; l.Recovery=46 end
 do local h=Rules.HeroMoves.Solarion.Heavy; h.Startup=58; h.Active=4; h.Recovery=61 end
+
+-- V59 (Peter, 2026-10-16: "Valkyra her own hero, her own shield, move different to bulwark"; kit approved the same day):
+-- Valkyra, the Winged Shieldmaiden. A fifth hero with a light spear and a winged shield: quick combo, a lunging thrust,
+-- a thrown light javelin, a diving strike, a winged dash and a wing guard. Every move reuses a mechanic the game already
+-- has (line strike, Pounce leap, Lunge, Lift, the Shield defensive); numbers are first guesses for the playtest.
+Rules.Characters.Valkyra = {Health = 110, Speed = 17, DashSpeed = 48, Flies = true, Color = {0.184,0.310,0.659}, Accent = {0.847,0.659,0.220}}
+Rules.Defensives.Valkyra = {Name = "Aegis Wings", Kind = "Shield", Cooldown = 1080, Duration = 120, DamageScale = 0.4}
+-- Skill 1: a conjured light spear thrown in a straight line (a line strike like Lightning, not a cast); knocks a flyer down.
+Rules.Moves.JavelinOfLight = {Startup = 16, Active = 3, Recovery = 20, Damage = 13, AirDamage = 11, Stun = 18, Range = 40, Width = 3, Height = 4,
+ Cooldown = 240, HitStop = 6, Push = 4, Grounding = true, Cost = 30}
+-- Skill 2: leaps up and dives onto the nearest foe in front (Pounce = true: the Pounce leap, landing and splash code).
+Rules.Moves.ValkyrieDive = {Startup = 14, Active = 30, Recovery = 18, Damage = 18, Stun = 30, Range = 5.5, Width = 5, Height = 6,
+ Cooldown = 300, HitStop = 10, Push = 0, Whiff = 18, Leap = 30, Splash = 7, Cost = 35, Pounce = true}
+-- Skill 3: a wing-boosted dash through the foe; Untouchable = ticks she can't be hit from the start of the move.
+Rules.Moves.WingedRush = {Startup = 10, Active = 6, Recovery = 22, Damage = 10, Stun = 24, Range = 6, Width = 5, Height = 6,
+ Cooldown = 300, HitStop = 6, Push = 10, Lunge = 16, Whiff = 10, Cost = 25, Untouchable = 18}
+-- Her throw: grabs and flings the foe up into the air.
+Rules.Moves.SkyToss = {Startup = 6, Active = 2, Recovery = 20, Damage = 12, Stun = 34, Range = 4.5, Width = 3.5, Height = 5,
+ Cooldown = 60, HitStop = 6, Push = 2, Lift = 34, Whiff = 10, Throw = true, Fury = 10}
+Rules.HeroSkills.Valkyra = {Skill1 = "JavelinOfLight", Skill2 = "ValkyrieDive", Skill3 = "WingedRush"}
+Rules.HeroThrows.Valkyra = "SkyToss"
+Rules.HeroMoves.Valkyra = {
+ Light1 = {Title = "Spear Jab", Damage = 6, Startup = 4},
+ Light2 = {Title = "Shield Bash", Damage = 7, Startup = 5, Push = 4},
+ Light3 = {Title = "Rising Wing", Damage = 10, Startup = 7, Lift = 14},
+ Heavy = {Title = "Valhalla Thrust", Damage = 17, Startup = 16, Range = 10, Lunge = 4},
+}
+Rules.Titles.JavelinOfLight = "Javelin of Light"; Rules.Titles.ValkyrieDive = "Valkyrie Dive"
+Rules.Titles.WingedRush = "Winged Rush"; Rules.Titles.SkyToss = "Sky Toss"
+Rules.RemovedActions.Valkyra = {Super = true, Interrupt = true}
+Rules.Cancels.JavelinOfLight = {On = "Hit", Into = {"Dash"}}
+Rules.Cancels.ValkyrieDive = {On = "Hit", Into = {"Dash"}}
+Rules.Cancels.WingedRush = {On = "Hit", Into = {"Dash"}}
+-- A move that leaps like the Pounce (Solarion's Pounce, Valkyra's Valkyrie Dive).
+function Rules.isPounce(name)
+ local m = name and Rules.Moves[name]
+ return name == "Pounce" or (m ~= nil and m.Pounce == true)
+end
+do
+ local melee = Rules.isMelee
+ function Rules.isMelee(name) return melee(name) or name == "ValkyrieDive" or name == "WingedRush" or name == "SkyToss" end
+end
+-- Bulwark is himself again: the Paladin (his native rig) is his default skin.
+do
+ local o = Rules.Skins.Bulwark.Order
+ local i = table.find(o, "Paladin"); if i then table.remove(o, i) end
+ table.insert(o, 1, "Paladin")
+end
+table.clear(heroMoveCache)
 return Rules

@@ -1,0 +1,101 @@
+[
+ {
+  "clip": "Idle_Shield_Loop",
+  "duration": 2.5,
+  "frames": 61,
+  "hit": 48,
+  "hit_time": 2.0,
+  "mirror": false,
+  "name": "valkyra_idle"
+ },
+ {
+  "clip": "Jog_Fwd_Loop",
+  "duration": 0.9333333373069763,
+  "frames": 23,
+  "hit": 11,
+  "hit_time": 0.46666666865348816,
+  "mirror": false,
+  "name": "valkyra_run"
+ },
+ {
+  "clip": "Sword_Regular_A",
+  "duration": 0.4333333373069763,
+  "frames": 11,
+  "hit": 8,
+  "hit_time": 0.34666666984558103,
+  "mirror": false,
+  "name": "valkyra_light1"
+ },
+ {
+  "clip": "Sword_Regular_B",
+  "duration": 0.5333333611488342,
+  "frames": 14,
+  "hit": 9,
+  "hit_time": 0.36923078848765445,
+  "mirror": false,
+  "name": "valkyra_light2"
+ },
+ {
+  "clip": "Sword_Regular_C",
+  "duration": 1.0,
+  "frames": 25,
+  "hit": 10,
+  "hit_time": 0.4166666666666667,
+  "mirror": false,
+  "name": "valkyra_light3"
+ },
+ {
+  "clip": "Sword_Dash",
+  "duration": 1.5666667222976685,
+  "frames": 39,
+  "hit": 9,
+  "hit_time": 0.37105264475471095,
+  "mirror": false,
+  "name": "valkyra_heavy"
+ },
+ {
+  "clip": "OverhandThrow",
+  "duration": 1.213333373069763,
+  "frames": 30,
+  "hit": 13,
+  "hit_time": 0.5439080637898938,
+  "mirror": false,
+  "name": "valkyra_lightning"
+ },
+ {
+  "clip": "Sword_Heavy_Combo",
+  "duration": 1.33,
+  "frames": 33,
+  "hit": 12,
+  "hit_time": 0.49875000000000025,
+  "mirror": false,
+  "name": "valkyra_pounce"
+ },
+ {
+  "clip": "Shield_Dash",
+  "duration": 1.100000023841858,
+  "frames": 27,
+  "hit": 7,
+  "hit_time": 0.2961538525728079,
+  "mirror": false,
+  "name": "valkyra_charge"
+ },
+ {
+  "clip": "Melee_Hook",
+  "duration": 0.46666666865348816,
+  "frames": 12,
+  "hit": 7,
+  "hit_time": 0.2969696982340379,
+  "mirror": false,
+  "name": "valkyra_throw"
+ },
+ {
+  "clip": "Sword_Block",
+  "duration": 1.9933333333333334,
+  "frames": 24,
+  "hit": -1,
+  "hit_time": null,
+  "mirror": true,
+  "name": "valkyra_guard"
+ }
+]
