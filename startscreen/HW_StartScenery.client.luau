@@ -1,0 +1,578 @@
+--!nocheck
+-- HW_StartScenery (LocalScript for StarterPlayer > StarterPlayerScripts), 2026-10-27.
+-- Upgrades the start-screen arena scenery on each player's screen:
+--   torches get burning flames, the blue portal column glows, the crossed swords shine and clash,
+--   the short column under the dragon gets gold trim and a rune ring, and the dragon moves.
+-- It finds things by name. If it misses something, give that object a CollectionService tag
+-- (Studio: select it > Properties > Tags): HW_Torch, HW_Portal, HW_Swords, HW_Dragon or HW_Plinth.
+-- What it found is printed in Output as "[HW_StartScenery] ...".
+-- Purely visual, client side: nothing here changes gameplay, collisions or the server.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
+
+local CFG = {
+	Names = {
+		Torch = {"torch", "sconce", "brazier"},
+		Portal = {"portal", "gate", "pillar", "column", "crystal"},
+		Swords = {"sword", "blade"},
+		Dragon = {"dragon", "vyrath", "wyvern", "drake"},
+	},
+	Skip = {"hud", "gui", "fighter", "bot"},  -- names never touched
+	MaxTorches = 24,
+	Bloom = true,              -- lets Neon and lights glow
+	TorchLight = 14,           -- torch light range (studs)
+	PortalColour = Color3.fromRGB(70, 210, 255),
+	Gold = Color3.fromRGB(255, 196, 64),
+	FlameOrange = Color3.fromRGB(255, 140, 40),
+}
+
+local FIRE_TEX = "rbxasset://textures/particles/fire_main.dds"
+local SMOKE_TEX = "rbxasset://textures/particles/smoke_main.dds"
+local SPARK_TEX = "rbxasset://textures/particles/sparkles_main.dds"
+
+local folder = Instance.new("Folder")
+folder.Name = "HW_StartScenery_FX"
+folder.Parent = workspace
+
+local done = setmetatable({}, {__mode = "k"})
+local tickers = {}  -- functions run every frame: fn(t, dt)
+local found = {Torch = 0, Portal = 0, Swords = 0, Dragon = 0, Plinth = 0}
+
+local function log(...)
+	print("[HW_StartScenery]", ...)
+end
+
+local function lname(inst)
+	return string.lower(inst.Name)
+end
+
+local function nameHas(inst, list)
+	local n = lname(inst)
+	for _, w in ipairs(list) do
+		if string.find(n, w, 1, true) then return true end
+	end
+	return false
+end
+
+local function skipped(inst)
+	local p = inst
+	while p and p ~= workspace do
+		if nameHas(p, CFG.Skip) or p == folder then return true end
+		if p:IsA("Model") and Players:GetPlayerFromCharacter(p) then return true end
+		p = p.Parent
+	end
+	return false
+end
+
+-- World-axis box around a part or model.
+local function box(inst)
+	if inst:IsA("BasePart") then
+		local cf, s = inst.CFrame, inst.Size
+		local half = Vector3.new(
+			math.abs(cf.RightVector.X) * s.X + math.abs(cf.UpVector.X) * s.Y + math.abs(cf.LookVector.X) * s.Z,
+			math.abs(cf.RightVector.Y) * s.X + math.abs(cf.UpVector.Y) * s.Y + math.abs(cf.LookVector.Y) * s.Z,
+			math.abs(cf.RightVector.Z) * s.X + math.abs(cf.UpVector.Z) * s.Y + math.abs(cf.LookVector.Z) * s.Z) / 2
+		return cf.Position, half * 2
+	end
+	local ok, cf, s = pcall(function() return inst:GetBoundingBox() end)
+	if not ok then return nil end
+	return cf.Position, s
+end
+
+local function parts(inst)
+	local list = {}
+	if inst:IsA("BasePart") then table.insert(list, inst) end
+	for _, d in ipairs(inst:GetDescendants()) do
+		if d:IsA("BasePart") then table.insert(list, d) end
+	end
+	return list
+end
+
+local function anchorPart(pos, name)
+	local p = Instance.new("Part")
+	p.Name = name or "HW_FXAnchor"
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Transparency = 1
+	p.Size = Vector3.new(0.2, 0.2, 0.2)
+	p.CFrame = CFrame.new(pos)
+	p.Parent = folder
+	return p
+end
+
+local function seq(...)
+	return NumberSequence.new(...)
+end
+
+local function emitter(parent, props)
+	local e = Instance.new("ParticleEmitter")
+	for k, v in pairs(props) do e[k] = v end
+	e.Parent = parent
+	return e
+end
+
+local function addBloom()
+	if not CFG.Bloom or Lighting:FindFirstChild("HW_StartBloom") then return end
+	for _, c in ipairs(Lighting:GetChildren()) do
+		if c:IsA("BloomEffect") then return end  -- the place already has bloom
+	end
+	local b = Instance.new("BloomEffect")
+	b.Name = "HW_StartBloom"
+	b.Intensity = 0.7
+	b.Size = 28
+	b.Threshold = 1.4
+	b.Parent = Lighting
+end
+
+---------------------------------------------------------------- torches
+local function lightTorch(torch)
+	local pos, size = box(torch)
+	if not pos or size.Y < 1 then return end
+	-- Fire sits a little above the top of the torch head.
+	local top = pos + Vector3.new(0, size.Y / 2 + 0.25, 0)
+	local w = math.clamp(math.min(size.X, size.Z), 0.8, 3)
+	local a = anchorPart(top, "HW_TorchFlame")
+	-- Leave any old fire the model had, but switch it on.
+	for _, d in ipairs(torch:GetDescendants()) do
+		if d:IsA("Fire") or d:IsA("ParticleEmitter") or d:IsA("PointLight") then d.Enabled = true end
+	end
+	emitter(a, {  -- flame core
+		Texture = FIRE_TEX, LightEmission = 1, LightInfluence = 0,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 240, 160)),
+			ColorSequenceKeypoint.new(0.35, CFG.FlameOrange),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 30, 10))}),
+		Size = seq({NumberSequenceKeypoint.new(0, w * 1.1), NumberSequenceKeypoint.new(0.6, w * 0.8), NumberSequenceKeypoint.new(1, 0)}),
+		Transparency = seq({NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(0.7, 0.4), NumberSequenceKeypoint.new(1, 1)}),
+		Lifetime = NumberRange.new(0.45, 0.8), Rate = 38, Speed = NumberRange.new(2.5, 4.5),
+		SpreadAngle = Vector2.new(8, 8), Acceleration = Vector3.new(0, 4, 0),
+		Rotation = NumberRange.new(-180, 180), RotSpeed = NumberRange.new(-90, 90),
+		EmissionDirection = Enum.NormalId.Top, LockedToPart = false,
+	})
+	emitter(a, {  -- embers
+		Texture = SPARK_TEX, LightEmission = 1, LightInfluence = 0,
+		Color = ColorSequence.new(Color3.fromRGB(255, 180, 70)),
+		Size = seq(0.18, 0), Lifetime = NumberRange.new(0.8, 1.6), Rate = 6,
+		Speed = NumberRange.new(3, 6), SpreadAngle = Vector2.new(25, 25), Acceleration = Vector3.new(0, 2, 0),
+		EmissionDirection = Enum.NormalId.Top,
+	})
+	emitter(a, {  -- thin smoke
+		Texture = SMOKE_TEX, LightInfluence = 0.3,
+		Color = ColorSequence.new(Color3.fromRGB(60, 50, 45)),
+		Size = seq(w * 0.6, w * 1.8), Transparency = seq(0.75, 1),
+		Lifetime = NumberRange.new(1.4, 2.2), Rate = 5, Speed = NumberRange.new(2, 3),
+		Acceleration = Vector3.new(0.4, 1, 0), EmissionDirection = Enum.NormalId.Top,
+		Rotation = NumberRange.new(-180, 180), RotSpeed = NumberRange.new(-20, 20),
+	})
+	local light = Instance.new("PointLight")
+	light.Color = CFG.FlameOrange
+	light.Range = CFG.TorchLight
+	light.Brightness = 2
+	light.Shadows = false
+	light.Parent = a
+	local seed = math.random() * 100
+	table.insert(tickers, function(t)
+		-- Flicker: two waves plus a little noise.
+		local f = math.sin(t * 11 + seed) * 0.25 + math.sin(t * 23.7 + seed * 2) * 0.15 + math.noise(t * 3, seed) * 0.3
+		light.Brightness = 2 + f
+		light.Range = CFG.TorchLight + f * 2
+	end)
+	found.Torch += 1
+end
+
+---------------------------------------------------------------- portal / glass column
+local function glowPortal(portal)
+	local pos, size = box(portal)
+	if not pos then return end
+	local col = CFG.PortalColour
+	for _, p in ipairs(parts(portal)) do
+		-- Glassy panels: make them read as glowing energy, keep the dark frame.
+		local c = p.Color
+		local bluish = c.B > c.R * 1.3 and c.B > 0.45
+		if p.Material == Enum.Material.Glass or p.Material == Enum.Material.ForceField or (bluish and p.Transparency > 0.05) then
+			p.Material = Enum.Material.Neon
+			p.Color = col
+			p.Transparency = math.clamp(p.Transparency, 0.25, 0.45)
+			local sl = Instance.new("SurfaceLight")
+			sl.Face = Enum.NormalId.Front
+			sl.Color = col
+			sl.Brightness = 3
+			sl.Range = 16
+			sl.Angle = 120
+			sl.Parent = p
+			local sl2 = sl:Clone()
+			sl2.Face = Enum.NormalId.Back
+			sl2.Parent = p
+		end
+	end
+	local core = anchorPart(pos, "HW_PortalCore")
+	local light = Instance.new("PointLight")
+	light.Color = col
+	light.Range = math.clamp(size.Y * 1.6, 16, 40)
+	light.Brightness = 3
+	light.Parent = core
+	-- Swirl of motes rising through the column.
+	local att = Instance.new("Attachment")
+	att.Position = Vector3.new(0, -size.Y / 2, 0)
+	att.Parent = core
+	emitter(att, {
+		Texture = SPARK_TEX, LightEmission = 1, LightInfluence = 0,
+		Color = ColorSequence.new(Color3.fromRGB(180, 245, 255), col),
+		Size = seq({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.2, 0.45), NumberSequenceKeypoint.new(1, 0)}),
+		Lifetime = NumberRange.new(2, 3.2), Rate = 22,
+		Speed = NumberRange.new(size.Y / 3, size.Y / 2.2), SpreadAngle = Vector2.new(6, 6),
+		EmissionDirection = Enum.NormalId.Top, Shape = Enum.ParticleEmitterShape.Disc,
+		ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface,
+	})
+	-- Two energy rings orbiting up and down the column.
+	local r = math.max(size.X, size.Z) * 0.62
+	local rings = {}
+	for i = 1, 2 do
+		local ring = Instance.new("Part")
+		ring.Name = "HW_PortalRing"
+		ring.Shape = Enum.PartType.Cylinder
+		ring.Anchored, ring.CanCollide, ring.CanQuery, ring.CanTouch, ring.CastShadow = true, false, false, false, false
+		ring.Material = Enum.Material.ForceField
+		ring.Color = col
+		ring.Size = Vector3.new(0.15, r * 2, r * 2)
+		ring.Parent = folder
+		rings[i] = ring
+	end
+	local base = pos
+	table.insert(tickers, function(t)
+		light.Brightness = 3 + math.sin(t * 2.2) * 0.8
+		for i, ring in ipairs(rings) do
+			local h = math.sin(t * 0.7 + i * math.pi) * size.Y * 0.4
+			ring.CFrame = CFrame.new(base + Vector3.new(0, h, 0)) * CFrame.Angles(0, t * (0.6 + i * 0.2), 0) * CFrame.Angles(0, 0, math.pi / 2)
+		end
+	end)
+	found.Portal += 1
+end
+
+---------------------------------------------------------------- crossed swords
+local function upgradeSwords(group)
+	local all = parts(group)
+	if #all == 0 then return end
+	local pos, size = box(group)
+	for _, p in ipairs(all) do
+		local c = p.Color
+		local lum = c.R * 0.3 + c.G * 0.59 + c.B * 0.11
+		local warm = c.R > c.B * 1.3
+		if lum > 0.45 and not warm then  -- blade: polished steel
+			p.Material = Enum.Material.Metal
+			p.Color = Color3.fromRGB(205, 215, 230)
+			p.Reflectance = 0.35
+		elseif warm and lum > 0.3 then  -- hilt / guard: gold
+			p.Material = Enum.Material.Metal
+			p.Color = CFG.Gold
+			p.Reflectance = 0.2
+		end
+	end
+	local h = Instance.new("Highlight")
+	h.FillTransparency = 1
+	h.OutlineColor = CFG.Gold
+	h.OutlineTransparency = 0.35
+	h.DepthMode = Enum.HighlightDepthMode.Occluded
+	h.Adornee = group
+	h.Parent = folder
+	local a = anchorPart(pos, "HW_SwordGlint")
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(200, 230, 255)
+	light.Range = math.max(size.Magnitude, 10)
+	light.Brightness = 1
+	light.Parent = a
+	local glint = emitter(a, {
+		Texture = SPARK_TEX, LightEmission = 1, LightInfluence = 0,
+		Color = ColorSequence.new(Color3.fromRGB(255, 250, 220)),
+		Size = seq({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.3, 0.8), NumberSequenceKeypoint.new(1, 0)}),
+		Lifetime = NumberRange.new(0.5, 0.9), Rate = 3, Speed = NumberRange.new(0, 0.5),
+		Shape = Enum.ParticleEmitterShape.Box, ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume,
+	})
+	a.Size = size * 0.8
+	local sparks = emitter(a, {
+		Texture = SPARK_TEX, LightEmission = 1, LightInfluence = 0, Enabled = false,
+		Color = ColorSequence.new(Color3.fromRGB(255, 220, 120), CFG.FlameOrange),
+		Size = seq(0.35, 0), Lifetime = NumberRange.new(0.3, 0.7), Speed = NumberRange.new(8, 16),
+		SpreadAngle = Vector2.new(180, 180), Drag = 4,
+	})
+	local nextClash = 3
+	table.insert(tickers, function(t)
+		-- Every 6 s the swords "clash": a flash and a burst of sparks where they cross.
+		if t > nextClash then
+			nextClash = t + 6
+			sparks:Emit(28)
+			light.Brightness = 6
+			TweenService:Create(light, TweenInfo.new(0.6), {Brightness = 1}):Play()
+		end
+	end)
+	found.Swords += 1
+end
+
+---------------------------------------------------------------- short column under the dragon
+local function upgradePlinth(p)
+	if not p:IsA("BasePart") then return end
+	if p.Size.X > 40 or p.Size.Z > 40 then return end  -- that's the arena floor, not a plinth
+	local cf, s = p.CFrame, p.Size
+	local function trim(y, grow, th)
+		local t = Instance.new("Part")
+		t.Name = "HW_PlinthTrim"
+		t.Anchored, t.CanCollide, t.CanQuery, t.CanTouch = true, false, false, false
+		t.Material = Enum.Material.Metal
+		t.Color = CFG.Gold
+		t.Reflectance = 0.2
+		t.Size = Vector3.new(s.X + grow, th, s.Z + grow)
+		t.CFrame = cf * CFrame.new(0, y, 0)
+		t.Parent = folder
+		return t
+	end
+	trim(s.Y / 2 - 0.15, 0.5, 0.3)       -- top lip
+	trim(-s.Y / 2 + 0.3, 0.9, 0.6)       -- base step
+	local band = trim(s.Y / 2 - 0.7, 0.12, 0.18)
+	band.Material = Enum.Material.Neon
+	band.Color = Color3.fromRGB(255, 170, 60)
+	-- Slow rune ring on the ground around it.
+	local ring = Instance.new("Part")
+	ring.Name = "HW_PlinthRunes"
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Anchored, ring.CanCollide, ring.CanQuery, ring.CanTouch, ring.CastShadow = true, false, false, false, false
+	ring.Material = Enum.Material.Neon
+	ring.Color = Color3.fromRGB(255, 150, 40)
+	ring.Transparency = 0.55
+	local d = math.max(s.X, s.Z) + 3
+	ring.Size = Vector3.new(0.06, d, d)
+	ring.Parent = folder
+	local inner = ring:Clone()
+	inner.Color = Color3.fromRGB(25, 20, 30)
+	inner.Material = Enum.Material.SmoothPlastic
+	inner.Transparency = 0
+	inner.Size = Vector3.new(0.08, d - 0.8, d - 0.8)
+	inner.Parent = folder
+	local floorY = cf.Position.Y - s.Y / 2 + 0.05
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 160, 60)
+	light.Range = d * 1.4
+	light.Brightness = 1.2
+	light.Parent = ring
+	table.insert(tickers, function(t)
+		local c = CFrame.new(cf.Position.X, floorY, cf.Position.Z) * CFrame.Angles(0, t * 0.25, math.pi / 2)
+		ring.CFrame = c
+		inner.CFrame = c
+		ring.Transparency = 0.5 + math.sin(t * 1.6) * 0.15
+	end)
+	found.Plinth += 1
+end
+
+---------------------------------------------------------------- dragon
+local function animateDragon(dragon)
+	-- 1) A real animation inside the model wins.
+	local animator = dragon:FindFirstChildWhichIsA("Animator", true)
+	local anim = dragon:FindFirstChildWhichIsA("Animation", true)
+	if animator and anim and anim.AnimationId ~= "" then
+		local ok, track = pcall(function() return animator:LoadAnimation(anim) end)
+		if ok and track then
+			track.Looped = true
+			track:Play()
+			log("dragon: playing", anim.Name)
+		end
+	end
+
+	-- 2) Skinned dragon: move its bones (wings beat slowly, tail and neck sway, jaw opens).
+	local bones = {}
+	for _, b in ipairs(dragon:GetDescendants()) do
+		if b:IsA("Bone") then
+			local n = lname(b)
+			local kind = (n:find("wing") and "wing") or (n:find("tail") and "tail")
+				or (n:find("jaw") and "jaw") or ((n:find("neck") or n:find("head")) and "neck") or nil
+			if kind then table.insert(bones, {b = b, kind = kind, side = (n:find("_l") or n:find("left")) and 1 or -1}) end
+		end
+	end
+
+	-- 3) Whole-statue idle: breathing bob, slow head turn, nostril smoke, a fire puff now and then.
+	local isModel = dragon:IsA("Model")
+	local home = isModel and dragon:GetPivot() or dragon.CFrame
+	local pos, size = box(dragon)
+	local look = home.LookVector
+	local head = dragon:FindFirstChild("Head", true)
+	local mouthPos = head and head:IsA("BasePart") and head.Position
+		or (pos + Vector3.new(look.X, 0, look.Z).Unit * size.Z * 0.45 + Vector3.new(0, size.Y * 0.3, 0))
+	local mouth = anchorPart(mouthPos, "HW_DragonMouth")
+	mouth.CFrame = CFrame.lookAt(mouthPos, mouthPos + look)
+	emitter(mouth, {
+		Texture = SMOKE_TEX, LightInfluence = 0.5,
+		Color = ColorSequence.new(Color3.fromRGB(90, 80, 70)),
+		Size = seq(0.4, 1.6), Transparency = seq(0.6, 1), Lifetime = NumberRange.new(1, 1.6),
+		Rate = 4, Speed = NumberRange.new(1, 2), Acceleration = Vector3.new(0, 1.5, 0),
+		EmissionDirection = Enum.NormalId.Front,
+	})
+	local breath = emitter(mouth, {
+		Texture = FIRE_TEX, LightEmission = 1, LightInfluence = 0, Enabled = false,
+		Color = ColorSequence.new(Color3.fromRGB(255, 230, 140), Color3.fromRGB(255, 80, 20)),
+		Size = seq(0.8, 3), Transparency = seq(0.1, 1), Lifetime = NumberRange.new(0.4, 0.7),
+		Rate = 80, Speed = NumberRange.new(14, 20), SpreadAngle = Vector2.new(12, 12),
+		EmissionDirection = Enum.NormalId.Front,
+	})
+	local glow = Instance.new("PointLight")
+	glow.Color = Color3.fromRGB(255, 120, 40)
+	glow.Range = 14
+	glow.Brightness = 0
+	glow.Parent = mouth
+	-- Gold shimmer on the statue.
+	local shine = anchorPart(pos, "HW_DragonShine")
+	shine.Size = size * 0.8
+	emitter(shine, {
+		Texture = SPARK_TEX, LightEmission = 1, LightInfluence = 0,
+		Color = ColorSequence.new(CFG.Gold), Size = seq({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.5, 0.3), NumberSequenceKeypoint.new(1, 0)}),
+		Lifetime = NumberRange.new(0.6, 1), Rate = 5, Speed = NumberRange.new(0, 0.3),
+		Shape = Enum.ParticleEmitterShape.Box, ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume,
+	})
+
+	local canMove = true
+	for _, p in ipairs(parts(dragon)) do
+		if not p.Anchored then canMove = false end  -- physics owns it; leave its position alone
+	end
+	local nextPuff = 5
+	table.insert(tickers, function(t)
+		local breathe = math.sin(t * 1.6)
+		if canMove then
+			local cf = home * CFrame.new(0, 0.12 * breathe, 0) * CFrame.Angles(0.012 * breathe, math.sin(t * 0.35) * math.rad(10), 0)
+			if isModel then dragon:PivotTo(cf) else dragon.CFrame = cf end
+			local off = cf * home:Inverse()
+			mouth.CFrame = off * CFrame.lookAt(mouthPos, mouthPos + look)
+		end
+		for _, e in ipairs(bones) do
+			local w
+			if e.kind == "wing" then
+				w = CFrame.Angles(0, 0, e.side * math.rad(12) * math.sin(t * 1.6))
+			elseif e.kind == "tail" then
+				w = CFrame.Angles(0, math.rad(6) * math.sin(t * 0.9), 0)
+			elseif e.kind == "neck" then
+				w = CFrame.Angles(math.rad(3) * breathe, math.rad(5) * math.sin(t * 0.35), 0)
+			else  -- jaw opens for the fire puff
+				w = CFrame.Angles(math.rad(t > nextPuff - 1.2 and 18 or 2), 0, 0)
+			end
+			e.b.Transform = w
+		end
+		if t > nextPuff then
+			nextPuff = t + 8 + math.random() * 4
+			breath.Enabled = true
+			glow.Brightness = 4
+			task.delay(0.9, function()
+				breath.Enabled = false
+				TweenService:Create(glow, TweenInfo.new(0.5), {Brightness = 0}):Play()
+			end)
+		end
+	end)
+
+	-- The short column it stands on.
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = {dragon, folder}
+	local hit = workspace:Raycast(pos, Vector3.new(0, -size.Y - 20, 0), params)
+	if hit and hit.Instance and not done[hit.Instance] then
+		done[hit.Instance] = true
+		upgradePlinth(hit.Instance)
+	end
+
+	found.Dragon += 1
+	log(string.format("dragon %s: %d bones moving, %s", dragon:GetFullName(), #bones, canMove and "statue idle on" or "not anchored, idle off"))
+end
+
+---------------------------------------------------------------- finding things
+-- Climb to the outermost Model that still matches, so a torch model counts once (not each part).
+local function owner(inst, list)
+	local best = inst
+	local p = inst.Parent
+	while p and p ~= workspace do
+		if p:IsA("Model") and nameHas(p, list) then best = p end
+		p = p.Parent
+	end
+	return best
+end
+
+local function tryTag(inst, kind, fn)
+	if done[inst] then return end
+	done[inst] = true
+	local ok, err = pcall(fn, inst)
+	if not ok then warn("[HW_StartScenery] " .. kind .. " " .. inst:GetFullName() .. ": " .. tostring(err)) end
+end
+
+local handlers = {Torch = lightTorch, Portal = glowPortal, Swords = upgradeSwords, Dragon = animateDragon, Plinth = upgradePlinth}
+
+local function consider(inst)
+	if not (inst:IsA("Model") or inst:IsA("BasePart")) or done[inst] or skipped(inst) then return end
+	-- Tagged objects first.
+	for kind, fn in pairs(handlers) do
+		if CollectionService:HasTag(inst, "HW_" .. kind) then
+			tryTag(inst, kind, fn)
+			return
+		end
+	end
+	for _, kind in ipairs({"Dragon", "Swords", "Torch", "Portal"}) do
+		if nameHas(inst, CFG.Names[kind]) then
+			local o = owner(inst, CFG.Names[kind])
+			if done[o] then return end
+			if kind == "Torch" and found.Torch >= CFG.MaxTorches then return end
+			-- Crossed swords: group the pair under their shared parent when both are loose parts.
+			if kind == "Swords" and not o:IsA("Model") and o.Parent and o.Parent ~= workspace and o.Parent:IsA("Model") then
+				o = o.Parent
+			end
+			-- Skip anything big enough to be a building (a "gate" arch, a temple "pillar" row).
+			local _, s = box(o)
+			if s and (kind ~= "Dragon") and s.Magnitude > 80 then return end
+			tryTag(o, kind, handlers[kind])
+			return
+		end
+	end
+end
+
+local function scan()
+	for _, d in ipairs(workspace:GetDescendants()) do consider(d) end
+end
+
+local function report()
+	log(string.format("torches %d, portal %d, swords %d, dragon %d, plinth %d",
+		found.Torch, found.Portal, found.Swords, found.Dragon, found.Plinth))
+	for kind, n in pairs(found) do
+		if n == 0 and kind ~= "Plinth" then
+			log("no " .. kind .. " found: tag it HW_" .. kind .. " in Studio (Properties > Tags)")
+		end
+	end
+end
+
+addBloom()
+task.wait(1)
+scan()
+report()
+
+-- The arena may be built a few seconds later by the server; catch late arrivals.
+local pending = false
+workspace.DescendantAdded:Connect(function(d)
+	if pending or d:IsDescendantOf(folder) then return end
+	pending = true
+	task.delay(1, function()
+		pending = false
+		scan()
+	end)
+end)
+for _, kind in ipairs({"Torch", "Portal", "Swords", "Dragon", "Plinth"}) do
+	CollectionService:GetInstanceAddedSignal("HW_" .. kind):Connect(function(inst)
+		tryTag(inst, kind, handlers[kind])
+	end)
+end
+task.delay(10, report)
+
+local t0 = os.clock()
+RunService.RenderStepped:Connect(function(dt)
+	local t = os.clock() - t0
+	for i = #tickers, 1, -1 do
+		local ok = pcall(tickers[i], t, dt)
+		if not ok then table.remove(tickers, i) end
+	end
+end)
