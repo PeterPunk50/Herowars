@@ -376,14 +376,40 @@ end
 
 ---------------------------------------------------------------- dragon
 local function animateDragon(dragon)
-	-- 1) A real animation inside the model wins.
+	-- 1) A real animation inside the model wins: a published Animation, else an imported idle clip
+	-- (Import 3D puts clips in AnimSaves as KeyframeSequences; those play in Studio only until published).
+	local playing = false
 	local animator = dragon:FindFirstChildWhichIsA("Animator", true)
+	if not animator then
+		local ctrl = dragon:FindFirstChildWhichIsA("AnimationController", true) or dragon:FindFirstChildWhichIsA("Humanoid", true)
+		if ctrl then
+			animator = Instance.new("Animator")
+			animator.Parent = ctrl
+		end
+	end
 	local anim = dragon:FindFirstChildWhichIsA("Animation", true)
+	if animator and not (anim and anim.AnimationId ~= "") then
+		local ks
+		for _, d in ipairs(dragon:GetDescendants()) do
+			if d:IsA("KeyframeSequence") and lname(d):find("idle") and (not ks or #d.Name < #ks.Name) then ks = d end
+		end
+		if ks then
+			local ok, id = pcall(function()
+				return game:GetService("KeyframeSequenceProvider"):RegisterKeyframeSequence(ks)
+			end)
+			if ok and id then
+				anim = Instance.new("Animation")
+				anim.Name = ks.Name
+				anim.AnimationId = id
+			end
+		end
+	end
 	if animator and anim and anim.AnimationId ~= "" then
 		local ok, track = pcall(function() return animator:LoadAnimation(anim) end)
 		if ok and track then
 			track.Looped = true
 			track:Play()
+			playing = true
 			log("dragon: playing", anim.Name)
 		end
 	end
@@ -391,7 +417,7 @@ local function animateDragon(dragon)
 	-- 2) Skinned dragon: move its bones (wings beat slowly, tail and neck sway, jaw opens).
 	local bones = {}
 	for _, b in ipairs(dragon:GetDescendants()) do
-		if b:IsA("Bone") then
+		if b:IsA("Bone") and not playing then
 			local n = lname(b)
 			local kind = (n:find("wing") and "wing") or (n:find("tail") and "tail")
 				or (n:find("jaw") and "jaw") or ((n:find("neck") or n:find("head")) and "neck") or nil
