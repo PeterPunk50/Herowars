@@ -1,0 +1,341 @@
+--- ../r66ui11/src/BotAI__BOTAI.luau	2026-10-13 00:14:41.856048000 +0000
++++ src/BotAI__BOTAI.luau	2026-10-31 22:36:04.222884000 +0000
+@@ -8,9 +8,21 @@
+ -- player), move (spacing, strafing, flight) and telemetry (AI_* attributes, optional Output log).
+ -- Fair play: enemy attacks are noticed only React ticks after they start, invisible enemies can't be
+ -- targeted, and every press goes through the normal cooldown / Fury / recovery checks.
++--
++-- R66-ui12 (Peter, 2026-10-31: "the bot just runs up to the opponent and starts chopping, make it more strategic
++-- and tactical"): a stance layer on top of the tactics. The bot is always in one stance:
++--   neutral    waits just outside the enemy's reach and circles (footsies), pokes with ranged moves only
++--   engage     goes in for a short burst (Burst presses), then
++--   disengage  steps back out to the edge of reach (hit and out), and
++--   retreat    backs off while low on health, circling so it doesn't run off the arena.
++-- Melee, Combo and GapClose tactics only fire while engaging. Punish, Defend, Interrupt, AntiAir, Ranged, Zone and
++-- Evade work in every stance, so a miss or a stun still gets punished at once (and switches it to engage).
++-- Each hero has a Style in Rules.BotAI.Styles (Bulwark pushes forward, Tempest kites, Solarion dives in and out,
++-- Wraithstep waits and strikes). A hero with no kit gets an automatic one (BotAI.autoKit), so new heroes fight too.
+ local BotAI = {}
+ 
+ local function rand(r) return math.random(r[1], r[2]) end
++local OFFENCE -- R66-ui12, set below
+ -- R66-ui10: PathfindingService in the game; nil in the offline test.
+ local PFS = typeof(game) == "Instance" and game:GetService("PathfindingService") or nil
+ 
+@@ -71,6 +83,22 @@
+  return m and ((m.Damage or 0) >= 12 or (m.Stun or 0) >= 40 or m.Cast or m.Whirl or m.Snare or m.Grounding or m.Throw) and true or false
+ end
+ 
++-- R66-ui12: how far an enemy really threatens with a plain swing (Range + Lunge + a small margin), per hero.
++local reachCache = {}
++local function threatReach(m) return m and (m.Range or 0) + (m.Lunge or 0) + 1 or 0 end
++local function heroReach(ctx, hero)
++ if reachCache[hero] then return reachCache[hero] end
++ local Rules = ctx.Rules
++ local r = 0
++ for _, name in {"Light1", "Light2", "Heavy"} do
++  local ok, m = pcall(Rules.heroMove, hero, name)
++  if ok and m and not m.Cast and not m.Beam then r = math.max(r, threatReach(m)) end
++ end
++ if r == 0 then r = 8 end
++ reachCache[hero] = r
++ return r
++end
++
+ -- Pattern memory: the enemy's attack starts. Spam = SpamCount starts inside SpamWindow; with Learn the bot
+ -- expects the next start one average gap after the last.
+ local function remember(ctx, ai, t, act, dist)
+@@ -143,6 +171,9 @@
+  e.spam, e.gap, e.last = rhythm(ctx, ai)
+  if e.spam and e.gap and e.last then ai.expectAt = e.last.at + e.gap else ai.expectAt = nil end
+  e.tFlier = Rules.Characters[best.hero] and Rules.Characters[best.hero].Flies
++ -- R66-ui12: the enemy's swing reach, and whether its defensive is spent (the effect ended, so a player can tell).
++ e.tReach = heroReach(ctx, best.hero)
++ e.tDefDown = best.cooldowns ~= nil and now < (best.cooldowns.Defensive or 0)
+  return e
+ end
+ 
+@@ -170,7 +201,9 @@
+  return (e.hp or 1) < 0.5 and 40 or 0
+ end
+ TYPES.Defend = function(ctx, s, ai, e, tac, diff)
+- if not e.threat or (tac.Heavy and not e.heavy) then return nil end
++ -- R66-ui12: the defensive is saved for big hits, except when low on health (then anything that would land).
++ local low = (e.hp or 1) < cfg(ctx).LowHealth + 0.1
++ if not e.threat or (tac.Heavy and not e.heavy and not low) then return nil end
+  if e.toHit > (tac.Lead or 20) then return nil end
+  if not roll(ai, "defend" .. tostring(e.act), diff.Defend) then return nil end
+  return e.heavy and 30 or 0
+@@ -178,8 +211,9 @@
+ TYPES.Evade = function(ctx, s, ai, e, tac, diff)
+  -- No button: step out of a noticed attack's reach (melee) or sideways (a ranged line). Lock-ons can't be walked out of.
+  if not e.threat or e.toHit < 3 or e.move.LockOn or e.move.Whirl or s.flying then return nil end
+- if not roll(ai, "evade" .. tostring(e.act), diff.Defend) then return nil end
+- return 0
++ -- R66-ui12: its own Dodge chance (was the Defend chance), and a big cast or heavy blow is dodged first.
++ if not roll(ai, "evade" .. tostring(e.act), diff.Dodge or diff.Defend) then return nil end
++ return (e.casting or e.heavy) and 40 or 0
+ end
+ TYPES.Escape = function(ctx, s, ai, e, tac, diff)
+  if (e.hp or 1) > cfg(ctx).LowHealth or e.dist > (tac.Max or 10) then return nil end
+@@ -283,6 +317,9 @@
+  return (s.fury or 0) - m.Cost < keep.Cost
+ end
+ 
++-- R66-ui12: tactics that walk the bot into the enemy; only while engaging.
++OFFENCE = {Melee = true, Combo = true, GapClose = true}
++
+ local function setAttr(s, name, value)
+  if s.model:GetAttribute(name) ~= value then s.model:SetAttribute(name, value) end
+ end
+@@ -297,6 +334,9 @@
+  local now = ctx.now()
+  ctx.doAction(s, use)
+  ai.stats.presses += 1
++ -- R66-ui12: for hit-and-out, variety and the pressure timer.
++ ai.lastPressAt = now; ai.lastTac = tac.Id; ai.lastTacAt = now
++ if OFFENCE[tac.Type] or tac.Type == "Punish" then ai.engagePresses = (ai.engagePresses or 0) + 1 end
+  local C = cfg(ctx)
+  if C.Attributes then
+   setAttr(s, "AI_Tactic", tac.Id); setAttr(s, "AI_Priority", "P" .. tac.P)
+@@ -313,13 +353,69 @@
+  end
+ end
+ 
++-- R66-ui12 stances. Style = Rules.BotAI.Styles[hero] (or Default).
++local function styleOf(ctx, s)
++ local C = cfg(ctx)
++ return C.Styles and (C.Styles[s.hero] or C.Styles.Default) or {}
++end
++local function setStance(ctx, s, ai, diff, name, ticks, why)
++ local now = ctx.now()
++ if ai.stance ~= name then log(ctx, s, ai, "stance " .. name .. " (" .. why .. ")") end
++ ai.stance = name; ai.stanceUntil = now + ticks
++ if name == "engage" then ai.engagePresses = 0; ai.engageQuota = rand(diff.Burst or {1, 3}) end
++ if cfg(ctx).Attributes then setAttr(s, "AI_Stance", name) end
++end
++local function chooseStance(ctx, s, ai, e, diff, kit, st)
++ local C, now = cfg(ctx), ctx.now()
++ local cur = ai.stance
++ local hp, thp = e.hp or 1, e.thp or 1
++ -- 1. Low on health and behind: back off for a while (Bulwark's style never does).
++ local lowAt = st.RetreatHP or C.LowHealth
++ if cur ~= "retreat" and hp < lowAt and thp > hp + 0.1 and not e.tHeld then
++  if roll(ai, "retreat" .. tostring(math.floor(now / 240)), diff.Retreat or 0) then
++   setStance(ctx, s, ai, diff, "retreat", rand(st.RetreatTime or {90, 150}), "low health"); return
++  end
++ end
++ if cur == "retreat" and now < (ai.stanceUntil or 0) then return end
++ -- 2. An opening: the enemy missed, is held, is nearly dead, or (Read) has spent its defensive.
++ local opening = e.whiff or e.tHeld or thp < 0.25 or (diff.Read and e.tDefDown and (e.dist or 99) < (kit.Ideal or 5) + 12)
++ if opening and cur ~= "engage" then
++  setStance(ctx, s, ai, diff, "engage", rand({60, 100}), e.whiff and "you missed" or e.tHeld and "you are held" or thp < 0.25 and "you are low" or "your defensive is down")
++  return
++ end
++ -- 3. Hit and out: the burst is spent and its last move is over.
++ if cur == "engage" and (ai.engagePresses or 0) >= (ai.engageQuota or 2) and not s.action and not (ai.plan and #ai.plan > 0) then
++  if math.random() < (diff.Discipline or 0.5) * (st.HitAndOut or 0.5) then
++   setStance(ctx, s, ai, diff, "disengage", rand(st.OutTime or {30, 55}), "hit and out"); return
++  end
++  ai.engageQuota = (ai.engageQuota or 2) + rand(diff.Burst or {1, 3}) -- keeps swinging (the old rush)
++ end
++ -- 4. The enemy walks into its space while it waits: check them.
++ if (cur == "neutral" or cur == "disengage") and (e.dist or 99) < (kit.Ideal or 5) + 1.5 and not e.act
++  and roll(ai, "check" .. tostring(math.floor(now / 30)), diff.Counter or 0.2) then
++  setStance(ctx, s, ai, diff, "engage", rand({45, 80}), "you walked in"); return
++ end
++ -- 5. The stance ran out: go in or wait, by style, health lead and patience.
++ if now >= (ai.stanceUntil or 0) then
++  local aggro = (st.Aggro or 0.5) + (hp - thp) * 0.5
++  local why = "style"
++  if now - (ai.lastPressAt or now - 9999) > (diff.Pressure or 180) then aggro = 1; why = "nothing happening" end
++  if math.random() >= (diff.Patience or 0.6) then aggro = 1; why = "impatient" end
++  if math.random() < aggro then setStance(ctx, s, ai, diff, "engage", rand(st.EngageTime or {60, 120}), why)
++  else setStance(ctx, s, ai, diff, "neutral", rand(st.NeutralTime or {40, 90}), "waiting for an opening") end
++ end
++end
++
+ -- Pick the best tactic for this moment and use it. Returns true if something was pressed.
+ local function decide(ctx, s, ai, e, diff, kit)
+  local C, now = cfg(ctx), ctx.now()
+  local fits, rejected = {}, nil
++ local engaging = ai.stance == nil or ai.stance == "engage"
+  for _, tac in kit.Tactics do
+   local check = TYPES[tac.Type]
+-  local bonus = check and check(ctx, s, ai, e, tac, diff)
++  local bonus = (engaging or not OFFENCE[tac.Type]) and check and check(ctx, s, ai, e, tac, diff)
++  -- R66-ui12: the same tactic twice in a row scores less, so it mixes its moves.
++  if bonus and tac.Id == ai.lastTac and now - (ai.lastTacAt or -999) < 150 then bonus -= (diff.Variety or 0) end
+   if bonus then
+    local ok, why = true, nil
+    if tac.Use then ok, why = ready(ctx, s, tac.Use) end
+@@ -347,6 +443,10 @@
+   log(ctx, s, ai, "BaitSpam: steps out of reach of the expected attack")
+   return true
+  end
++ if tac.Type == "Punish" and ai.stance ~= "engage" and ai.stance ~= "retreat" then
++  setStance(ctx, s, ai, diff, "engage", rand({50, 80}), "punish")
++  ai.engagePresses = 0
++ end
+  if tac.Type == "Evade" then
+   local ranged = (e.move.Range or 0) > 12
+   ai.mode = ranged and "sidestep" or "evade"; ai.modeUntil = now + e.toHit + 14
+@@ -412,6 +512,27 @@
+  return want
+ end
+ 
++-- R66-ui12: never back off a ledge. A step that has no floor under it (12 studs down, 4 studs ahead) is turned
++-- into a sidestep, or cancelled. Only checked when the bot moves away from or around the enemy.
++local function safeDir(ctx, s, e, dir)
++ if typeof(workspace) ~= "Instance" or dir.Magnitude < 0.1 or s.flying then return dir end
++ local params = RaycastParams.new()
++ params.FilterType = Enum.RaycastFilterType.Exclude
++ params.FilterDescendantsInstances = {s.model, e.t.model}
++ local function hasFloor(d)
++  local from = s.root.Position + d.Unit * 4
++  return workspace:Raycast(from, Vector3.new(0, -12, 0), params) ~= nil
++ end
++ if hasFloor(dir) then return dir end
++ local side = e.flat:Cross(Vector3.yAxis)
++ for _, alt in {side, -side} do if hasFloor(alt) then return alt end end
++ return Vector3.zero
++end
++local function blend(a, wa, b, wb)
++ local v = a * wa + b * wb
++ return v.Magnitude > 0.05 and v.Unit or Vector3.zero
++end
++
+ -- Movement every tick: keep the kit's range, strafe, step out for a bait, retreat, fly.
+ local function move(ctx, s, ai, e, diff, kit)
+  local now = ctx.now()
+@@ -419,19 +540,44 @@
+  local side = flat:Cross(Vector3.yAxis)
+  local dir = Vector3.zero
+  local state
++ local st = styleOf(ctx, s)
++ -- R66-ui12: the neutral ring = just outside the enemy's swing (never closer than the kit's own range).
++ local ring = math.max(kit.Ideal or 5, (e.tReach or 8) + (st.Margin or 1.5))
++ if not ai.strafeAt or now >= ai.strafeAt then
++  ai.strafeAt = now + math.random(30, 70)
++  ai.strafeSign = math.random() < 0.5 and 1 or -1
++  ai.strafing = math.random() < diff.Spacing
++ end
+  if ai.mode == "bait" and now < (ai.modeUntil or 0) then dir = e.dist < (ai.baitReach or 9) and -flat or Vector3.zero; state = "baiting"
+- elseif ai.mode == "evade" and now < (ai.modeUntil or 0) then dir = -flat; state = "evading"
+- elseif ai.mode == "sidestep" and now < (ai.modeUntil or 0) then dir = side * (ai.sideSign or 1); state = "sidestepping"
+- elseif now < (ai.retreatUntil or 0) then dir = -flat; state = "retreating"
++ elseif ai.mode == "evade" and now < (ai.modeUntil or 0) then dir = safeDir(ctx, s, e, -flat); state = "evading"
++ elseif ai.mode == "sidestep" and now < (ai.modeUntil or 0) then dir = safeDir(ctx, s, e, side * (ai.sideSign or 1)); state = "sidestepping"
++ elseif now < (ai.retreatUntil or 0) then dir = safeDir(ctx, s, e, -flat); state = "retreating"
++ elseif e.tWhirl and e.dist < (e.tReach or 8) + 4 then
++  -- Don't walk into a Whirlwind spin.
++  dir = safeDir(ctx, s, e, blend(-flat, 0.8, side * (ai.strafeSign or 1), 0.6)); state = "keeping out of the spin"
++ elseif ai.stance == "retreat" then
++  -- Back off in a curve (circling away), so it doesn't run straight off the arena; far enough away it just circles.
++  if e.dist < ring + 10 then dir = safeDir(ctx, s, e, blend(-flat, 0.75, side * (ai.strafeSign or 1), 0.65))
++  else dir = safeDir(ctx, s, e, side * (ai.strafeSign or 1)) end
++  state = "backing off (low)"
++ elseif ai.stance == "disengage" then
++  if e.dist < ring then dir = safeDir(ctx, s, e, blend(-flat, 0.8, side * (ai.strafeSign or 1), 0.5)); state = "stepping out"
++  else dir = safeDir(ctx, s, e, side * (ai.strafeSign or 1)); state = "resetting" end
++ elseif ai.stance == "neutral" then
++  -- Footsies: hover at the ring and circle; creep in (Advance styles) or back up to keep the gap.
++  if e.dist > ring + 2.5 then
++   dir = navDir(ctx, s, ai, e, blend(flat, 0.85, side * (ai.strafeSign or 1), 0.45)); state = "edging in"
++  elseif e.dist < ring - 1.5 and not st.Advance then
++   dir = safeDir(ctx, s, e, blend(-flat, 0.7, side * (ai.strafeSign or 1), 0.6)); state = "keeping the gap"
++  elseif st.Advance and e.dist > (kit.Ideal or 5) + 3 then
++   dir = blend(flat, 0.45, side * (ai.strafeSign or 1), 0.8); state = "pressing forward"
++  else
++   dir = safeDir(ctx, s, e, side * (ai.strafeSign or 1)); state = "circling at range"
++  end
+  elseif e.dist > (kit.Ideal or 5) + 1.5 then
+   dir = navDir(ctx, s, ai, e, flat); state = ai.path and "following a path" or "closing in"
+- elseif e.dist < (kit.Min or 2) and roll(ai, "space" .. tostring(math.floor(now / 30)), diff.Spacing) then dir = -flat; state = "making space"
++ elseif e.dist < (kit.Min or 2) and roll(ai, "space" .. tostring(math.floor(now / 30)), diff.Spacing) then dir = safeDir(ctx, s, e, -flat); state = "making space"
+  else
+-  if not ai.strafeAt or now >= ai.strafeAt then
+-   ai.strafeAt = now + math.random(30, 70)
+-   ai.strafeSign = math.random() < 0.5 and 1 or -1
+-   ai.strafing = math.random() < diff.Spacing
+-  end
+   dir = ai.strafing and side * ai.strafeSign or Vector3.zero
+   state = ai.strafing and "circling" or "holding"
+  end
+@@ -462,9 +608,67 @@
+ 
+ function BotAI.reset(s) s.ai = nil end
+ 
++-- R66-ui12: a kit built from the hero's own moves, for any hero without one in Rules.BotAI.Kits (new heroes).
++-- Big ranged moves poke, leaps and charges close the gap, casts with a radius are zones, Heavy punishes.
++local autoKits = {}
++function BotAI.autoKit(Rules, hero)
++ if autoKits[hero] then return autoKits[hero] end
++ local function moveOf(action)
++  if not Rules.actionAvailable(hero, action) then return nil end
++  local ok, m = pcall(function()
++   local name = Rules.moveName(hero, action, 1)
++   return name and Rules.heroMove(hero, name)
++  end)
++  return ok and m or nil
++ end
++ local t = {}
++ local function add(tac) tac.Id = tac.Id or (tac.Type .. (tac.Use or "")); table.insert(t, tac) end
++ if Rules.Defensives and Rules.Defensives[hero] then
++  add({P = 1, Type = "StunBreak", Use = "Defensive"})
++  add({P = 1, Type = "Defend", Use = "Defensive", Lead = 24, Heavy = true})
++ end
++ local light, heavyMove = moveOf("Light"), moveOf("Heavy")
++ local melee = light and threatReach(light) or 0
++ if heavyMove and not heavyMove.Cast then
++  add({P = 1, Type = "Punish", Use = "Heavy", Max = threatReach(heavyMove)})
++  add({P = 2, Type = "Melee", Use = "Heavy", Max = threatReach(heavyMove)})
++  melee = math.max(melee, threatReach(heavyMove))
++ end
++ if light then
++  add({P = 1, Type = "Punish", Use = "Light", Max = threatReach(light), Bonus = -10})
++  add({P = 2, Type = "Combo", Chain = heavyMove and {"Light", "Light", "Light", "Heavy"} or {"Light", "Light", "Light"}, Max = threatReach(light)})
++ end
++ local ranged = false
++ for _, action in {"Skill1", "Skill2", "Skill3", "Interrupt", "Throw"} do
++  local m = moveOf(action)
++  if m then
++   local far = (m.Range or 0) + (m.Leap or 0)
++   if m.Interrupt then add({P = 1, Type = "Interrupt", Use = action, Max = far}) end
++   if (m.Radius or m.Aoe) and (m.Range or 0) < 6 and not m.Leap then
++    add({P = 2, Type = "Zone", Use = action, Max = math.max(m.Radius or 0, m.Aoe or 0)})
++   elseif m.Leap or m.Charge or (m.Lunge or 0) >= 6 then
++    add({P = 3, Type = "GapClose", Use = action, Min = 7, Max = math.max(10, far)})
++    add({P = 1, Type = "Punish", Use = action, Min = 4, Max = math.max(10, far), Bonus = -5})
++   elseif (m.Range or 0) >= 14 then
++    ranged = true
++    add({P = 2, Type = "Ranged", Use = action, Min = 8, Max = m.Range})
++    if m.AirOnly or m.Grounding then add({P = 1, Type = "AntiAir", Use = action, Max = m.Range}) end
++   else
++    add({P = 2, Type = "Melee", Use = action, Max = math.max(4, threatReach(m))})
++   end
++  end
++ end
++ add({P = 2, Type = "Evade", Id = "StepOut", Bonus = 40})
++ local ideal = melee > 0 and math.max(3.5, melee * 0.55) or 12
++ local kit = {Ideal = ideal, Min = 2, Tactics = t, Auto = true}
++ if melee == 0 and ranged then kit.Ideal = 14; kit.Min = 9 end
++ autoKits[hero] = kit
++ return kit
++end
++
+ function BotAI.think(s, ctx)
+  local C = cfg(ctx)
+- local kit = C.Kits[s.hero]
++ local kit = C.Kits[s.hero] or BotAI.autoKit(ctx.Rules, s.hero) -- R66-ui12: new heroes fight too
+  local diff = C.Difficulty[ctx.level()] or C.Difficulty.Normal
+  if not kit then return end
+  local now = ctx.now()
+@@ -493,6 +697,7 @@
+  end
+  if e.delta.Magnitude > 0.1 then s.aim = e.delta.Unit end
+  s.lock = true; s.hasTarget = true
++ chooseStance(ctx, s, ai, e, diff, kit, styleOf(ctx, s)) -- R66-ui12
+  move(ctx, s, ai, e, diff, kit)
+  -- A combo in progress: the next press as soon as the last one connects or ends.
+  if ai.plan and #ai.plan > 0 then

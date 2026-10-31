@@ -1,0 +1,47 @@
+--- ../r66ui11/src/Rules__3.luau	2026-10-13 01:01:36.043815000 +0000
++++ src/Rules__3.luau	2026-10-31 22:35:49.204377000 +0000
+@@ -911,14 +911,39 @@
+   -- R66-ui11 (Peter, 2026-10-13: "tone down the bot"): Easy is new and much weaker, with reactions about twice
+   -- as slow as the old Easy; Normal is the old Easy; Hard is the old Normal.
+   Easy = {React = {60, 96}, Think = {48, 72}, Defend = 0.08, Counter = 0.1, Combo = {1, 1}, AntiAir = 0.1,
+-   Interrupt = 0.05, Trinket = 0.1, Noise = 160, Mistake = 0.45, Learn = false, Bait = 0, Reserve = false,
+-   Respect = 0, Spacing = 0.15},
++   Interrupt = 0.05, Trinket = 0.1, Noise = 110, Mistake = 0.45, Learn = false, Bait = 0, Reserve = false,
++   Respect = 0, Spacing = 0.15,
++   Burst = {1, 2}, Discipline = 0.35, Patience = 0.5, Pressure = 240, Dodge = 0.1, Retreat = 0.3, Variety = 30, Read = false},
+   Normal = {React = {30, 48}, Think = {24, 36}, Defend = 0.2, Counter = 0.25, Combo = {1, 2}, AntiAir = 0.25,
+-   Interrupt = 0.15, Trinket = 0.25, Noise = 120, Mistake = 0.3, Learn = false, Bait = 0, Reserve = false,
+-   Respect = 0.1, Spacing = 0.3},
++   Interrupt = 0.15, Trinket = 0.25, Noise = 70, Mistake = 0.3, Learn = false, Bait = 0, Reserve = false,
++   Respect = 0.1, Spacing = 0.3,
++   Burst = {1, 3}, Discipline = 0.6, Patience = 0.7, Pressure = 200, Dodge = 0.25, Retreat = 0.5, Variety = 50, Read = false},
+   Hard = {React = {18, 30}, Think = {12, 20}, Defend = 0.5, Counter = 0.6, Combo = {2, 3}, AntiAir = 0.6,
+    Interrupt = 0.5, Trinket = 0.6, Noise = 50, Mistake = 0.1, Learn = false, Bait = 0, Reserve = true,
+-   Respect = 0.6, Spacing = 0.7},
++   Respect = 0.6, Spacing = 0.7,
++   Burst = {2, 3}, Discipline = 0.85, Patience = 0.85, Pressure = 170, Dodge = 0.55, Retreat = 0.65, Variety = 60, Read = true},
++ },
++ -- R66-ui12 (Peter, 2026-10-31: "the bot just runs up and starts chopping, make it more strategic and tactical"):
++ -- stance settings, added to each level above. Smarter, not stronger: reactions, defend and punish chances stay
++ -- as R66-ui11 set them.
++ --   Burst: presses per trip in before it steps back out.  Discipline: chance it really steps out (else keeps
++ --   swinging).  Patience: chance it waits in neutral instead of just walking in.  Pressure: ticks without a press
++ --   before it goes in anyway.  Dodge: chance to step out of a noticed attack (was the Defend chance).
++ --   Retreat: chance to back off when low and behind.  Variety: score taken off the tactic it used last.
++ --   Read: goes in when your defensive is on cooldown.  Noise is lower than R66-ui11 so its priorities matter.
++ -- Styles (per hero): Aggro = how often a stance ends in going in (0-1), Margin = studs it waits outside your
++ -- swing reach, HitAndOut = how much it likes stepping out after a burst, Advance = creeps forward while waiting
++ -- (never backs up), RetreatHP = health share it backs off at (0 = never), *Time = stance lengths in ticks.
++ Styles = {
++  Default = {Aggro = 0.5, Margin = 1.5, HitAndOut = 0.6},
++  -- Juggernaut: walks you down behind his shield, parries, punishes; never runs.
++  Bulwark = {Aggro = 0.6, Margin = 1, HitAndOut = 0.3, Advance = true, RetreatHP = 0, NeutralTime = {30, 60}},
++  -- Kiter: stays at lightning range, snares whoever walks in, blinks away; backs off early.
++  Tempest = {Aggro = 0.4, Margin = 4, HitAndOut = 0.9, RetreatHP = 0.4, OutTime = {40, 70}},
++  -- Diver: waits outside your reach, pounces in for a burst, gets out again.
++  Solarion = {Aggro = 0.5, Margin = 3, HitAndOut = 0.75, RetreatHP = 0.3, NeutralTime = {40, 80}},
++  -- Assassin: patient, pokes with Shade Bolts, goes in when you miss or are low.
++  Wraithstep = {Aggro = 0.3, Margin = 3.5, HitAndOut = 0.85, RetreatHP = 0.35, NeutralTime = {60, 110}},
+  },
+  -- Strategy kits. Ideal / Min = the range it likes and the closest it lets an enemy stay. Use = the button.
+  -- Type says what the tactic waits for (see BotAI for each):
